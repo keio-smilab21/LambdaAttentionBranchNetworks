@@ -1,0 +1,29 @@
+{
+    "seed": 42,
+    "model": "lambda_resnet",
+    "add_attention_branch": true,
+    "div": "layer2",
+    "base_pretrained": "checkpoints/lambda-resnet50.pth",
+    "trainable_bottleneck": 2,
+    "dataset": "IDRiD",
+    "image_size": 224,
+    "batch_size": 32,
+    "train_ratio": 0.8,
+    "loss_weights": [
+        2.0,
+        1.0
+    ],
+    "epochs": 300,
+    "optimizer": "AdamW",
+    "lr": 1e-4,
+    "lr_linear": 1e-3,
+    "lr_ab": 1e-3,
+    "min_lr": 1e-6,
+    "weight_decay": 0.09,
+    "factor": 0.333,
+    "sceduler_patience": 2,
+    "early_stopping_patience": 6,
+    "save_dir": "checkpoints",
+    "lambda_att": 1,
+    "lambda_var": 0
+}

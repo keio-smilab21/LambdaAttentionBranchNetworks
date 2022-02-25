@@ -1,0 +1,234 @@
+from typing import Any, Callable, Dict, Optional, Tuple, Union
+
+import torch.utils.data as data
+import torchvision.transforms as transforms
+from metrics.accuracy import Accuracy, MultiLabelAccuracy
+from metrics.base import Metric
+from torch import nn
+
+from data.IDRID import IDRiDDataset
+from data.IDRIDContrastive import IDRiDContrastiveDataset
+from data.voc_classification import VOCClassification
+
+ALL_DATASETS = ["VOC", "IDRiD", "IDRiDContrastive"]
+
+
+def setting_dataset(
+    dataset_name: str,
+    batch_size: int,
+    image_size: int = 224,
+    is_test: bool = False,
+    train_ratio: float = 0.9,
+    dataset_params: Optional[Dict[str, Any]] = None,
+    model=None,
+    device=None,
+) -> Tuple[
+    Union[data.DataLoader, Dict[str, data.DataLoader]],
+    Dict[str, Any],
+    Metric,
+    nn.modules.loss._Loss,
+]:
+    """
+    データセット名からデータローダー・評価指標・ロスの作成
+
+    Args:
+        dataset_name(str) : データセット名
+        batch_size  (int) : バッチサイズ
+        image_size  (int) : 画像サイズ
+        is_test     (bool): テストデータセットのみ作成
+        train_ratio(float): valがないとき，train / valの分割割合
+
+    Returns:
+        dataloader  : データローダーのdictまたはテストデータローダー
+        (Union[data.Dataloader, dict[str, data.Dataloader]])
+        metrics     : 評価指標
+        criterion   : ロス関数
+        model_params: モデルのパラメータ
+
+    Note:
+        model_paramsはnum_classesなどデータセットに依存するパラメータ
+    """
+    train_dataset = create_dataset(
+        dataset_name,
+        "train",
+        image_size,
+        model=model,
+        device=device,
+        batch_size=batch_size,
+    )
+    test_dataset = create_dataset(dataset_name, "test", image_size)
+
+    ## データセットに依存するモデル作成用パラメータを設定
+    model_params = {"is_multi_task": False, "num_tasks": None}
+
+    if dataset_name == "VOC":
+        metrics = MultiLabelAccuracy()
+        criterion = nn.BCEWithLogitsLoss()
+        val_dataset = create_dataset(dataset_name, "val", image_size)
+        model_params["num_classes"] = 20
+        model_params["is_multi_task"] = True
+        model_params["num_tasks"] = [11, 1, 2, 1, 5]
+    elif dataset_name in ["IDRiD", "IDRiDContrastive"]:
+        metrics = Accuracy()
+        assert dataset_params is not None
+        # criterion = nn.CrossEntropyLoss(weight=dataset_params["loss_weights"])
+        criterion = nn.BCEWithLogitsLoss(pos_weight=dataset_params["loss_weights"])
+        # lenが定義されてるとは限らないがIDRiDでは定義済みのため無視
+        # No `def __len__(self)` default? (data.Datasetより引用)
+        # See NOTE [ Lack of Default `__len__` in Python Abstract Base Classes ]
+        train_size = int(train_ratio * len(train_dataset))
+        val_size = len(train_dataset) - train_size
+
+        train_dataset, val_dataset = data.random_split(
+            train_dataset, [train_size, val_size]
+        )
+        val_dataset.transform = test_dataset.transform
+        model_params["num_classes"] = 2
+    else:
+        raise ValueError()
+
+    test_dataloader = data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
+
+    if is_test:
+        return test_dataloader, model_params, metrics, criterion
+
+    train_dataloader = data.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True
+    )
+    val_dataloader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    dataloader_dict = {
+        "Train": train_dataloader,
+        "Val": val_dataloader,
+        "Test": test_dataloader,
+    }
+
+    return dataloader_dict, model_params, metrics, criterion
+
+
+def create_dataset(
+    dataset_name: str,
+    image_set: str = "train",
+    image_size: int = 224,
+    theta_attetion: float = 0.5,
+    model=None,
+    device=None,
+    batch_size=None,
+    transform: Optional[Callable] = None,
+) -> data.Dataset:
+    """
+    データセットの作成
+    正規化パラメータなどはデータセットごとに作成
+
+    Args:
+        dataset_name(str)  : データセット名
+        image_set(str)     : train / val / testから選択
+        image_size(int)    : 画像サイズ
+        transform(Callable): transform
+
+    Returns:
+        data.Dataset : pytorchデータセット
+    """
+
+    params = get_dataset_params(dataset_name)
+
+    if transform is None:
+        if image_set == "train":
+            transform = transforms.Compose(
+                [
+                    transforms.Resize((image_size, image_size)),
+                    transforms.RandomHorizontalFlip(0.5),
+                    transforms.RandomVerticalFlip(0.5),
+                    transforms.RandomRotation(degrees=5),
+                    transforms.RandomResizedCrop(
+                        (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
+                    ),
+                    transforms.ColorJitter(
+                        brightness=0.5, contrast=0.5, saturation=0.5, hue=0
+                    ),
+                    transforms.ToTensor(),
+                    transforms.Normalize(params["mean"], params["std"]),
+                    transforms.RandomErasing(),
+                ]
+            )
+        else:
+            transform = transforms.Compose(
+                [
+                    transforms.Resize((image_size, image_size)),
+                    transforms.ToTensor(),
+                    transforms.Normalize(params["mean"], params["std"]),
+                ]
+            )
+
+    if dataset_name == "VOC":
+        dataset = VOCClassification(
+            root="./datasets",
+            year="2007",
+            image_set=image_set,
+            download=True,
+            transform=transform,
+        )
+    elif dataset_name == "IDRiD":
+        dataset = IDRiDDataset(
+            root="./datasets", image_set=image_set, transform=transform
+        )
+    elif dataset_name == "IDRiDContrastive":
+        dataset = IDRiDContrastiveDataset(
+            root="./datasets",
+            image_set=image_set,
+            theta_attention=theta_attetion,
+            transform=transform,
+        )
+    else:
+        raise ValueError()
+
+    return dataset
+
+
+def get_dataset_params(dataset_name: str) -> Dict[str, Any]:
+    """
+    データセットのパラメータを取得
+
+    Args:
+        dataset_name(str): データセット名
+
+    Returns:
+        dict[str, Any]: 平均・分散・クラス名などのパラメータ
+    """
+    params = dict()
+    # ImageNet
+    params["mean"] = (0.485, 0.456, 0.406)
+    params["std"] = (0.229, 0.224, 0.225)
+    if dataset_name == "VOC":
+        params["mean"] = (0.4472, 0.4231, 0.3912)
+        params["std"] = (0.2406, 0.2345, 0.2372)
+        params["classes"] = (
+            "aeroplane",
+            "bicycle",
+            "bird",
+            "boat",
+            "bottle",
+            "bus",
+            "car",
+            "cat",
+            "chair",
+            "cow",
+            "diningtable",
+            "dog",
+            "horse",
+            "motorbike",
+            "person",
+            "pottedplant",
+            "sheep",
+            "sofa",
+            "train",
+            "tvmonitor",
+        )
+    elif dataset_name in ["IDRiD", "IDRiDContrastive"]:
+        params["mean"] = (0.4329, 0.2094, 0.0687)
+        params["std"] = (0.3083, 0.1643, 0.0829)
+        params["classes"] = ("normal", "abnormal")
+
+    return params
