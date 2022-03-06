@@ -8,11 +8,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as data
+import wandb
 from torchinfo import summary
 from torchvision.models.resnet import Bottleneck as TorchBottleneck
 from tqdm import tqdm
 
-import wandb
 from data import ALL_DATASETS, setting_dataset
 from evaluate import test
 from metrics.base import Metric
