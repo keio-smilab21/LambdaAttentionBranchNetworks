@@ -8,10 +8,11 @@ import torch.utils.data as data
 from torchinfo import summary
 from tqdm import tqdm
 
-from data import ALL_DATASETS, setting_dataset
+from data import ALL_DATASETS, create_dataloader_dict
 from metrics.base import Metric
 from models import ALL_MODELS, create_model
-from utils.utils import calclurate_loss, fix_seed, parse_with_config
+from utils.utils import fix_seed
+from utils.loss import calculate_loss
 
 
 @torch.no_grad()
@@ -32,7 +33,7 @@ def test(
         inputs, labels = data[0].to(device), data[1].to(device)
         outputs = model(inputs)
 
-        total_loss += calclurate_loss(criterion, outputs, labels, model, lambdas).item()
+        total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
         metrics.evaluate(outputs, labels)
         total += labels.size(0)
 
@@ -45,11 +46,11 @@ def main() -> None:
 
     # データセットの作成
     dataset_params = {"loss_weights": torch.Tensor(args.loss_weights).to(device)}
-    dataloader, model_params, metric, criterion = setting_dataset(
+    dataloader, model_params, metric, criterion = create_dataloader_dict(
         args.dataset,
         args.batch_size,
         args.image_size,
-        is_test=True,
+        only_test=True,
         train_ratio=args.train_ratio,
         dataset_params=dataset_params,
     )

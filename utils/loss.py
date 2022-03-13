@@ -34,7 +34,7 @@ def criterion_with_cast_targets(
     return criterion(preds, targets)
 
 
-def calclurate_loss(
+def calculate_loss(
     criterion: nn.modules.loss._Loss,
     outputs: torch.Tensor,
     targets: torch.Tensor,

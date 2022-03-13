@@ -22,7 +22,7 @@ from models.attention_branch import Bottleneck as ABNBottleneck
 from models.lambda_resnet import Bottleneck as LambdaBottleneck
 from optim import ALL_OPTIM, create_optimizer
 from optim.sam import SAM
-from utils.loss import calclurate_loss
+from utils.loss import calculate_loss
 from utils.utils import fix_seed, module_generator, parse_with_config, save_json
 from utils.visualize import save_attention_map
 
@@ -193,7 +193,7 @@ def train(
         optimizer.zero_grad()
         outputs = model(inputs)
 
-        loss = calclurate_loss(criterion, outputs, labels, model, lambdas)
+        loss = calculate_loss(criterion, outputs, labels, model, lambdas)
         loss.backward()
         total_loss += loss.item()
         metric.evaluate(outputs, labels)
@@ -201,7 +201,7 @@ def train(
         # OptimizerがSAMのとき2回backwardする
         if isinstance(optimizer, SAM):
             optimizer.first_step(zero_grad=True)
-            loss_sam = calclurate_loss(criterion, model(inputs), labels, model, lambdas)
+            loss_sam = calculate_loss(criterion, model(inputs), labels, model, lambdas)
             loss_sam.backward()
             optimizer.second_step(zero_grad=True)
         else:
