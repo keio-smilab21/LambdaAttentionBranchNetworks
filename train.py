@@ -219,7 +219,10 @@ def train(
     return train_loss, metrics
 
 
-def main():
+def main(args: argparse.Namespace):
+    now = datetime.datetime.now()
+    now_str = now.strftime("%Y-%m-%d_%H%M%S")
+
     fix_seed(args.seed, args.no_deterministic)
 
     # データセットの作成
@@ -269,6 +272,16 @@ def main():
         min_lr=args.min_lr,
         verbose=True,
     )
+
+    if args.model is not None:
+        config_file = os.path.basename(args.config)
+        run_name = os.path.splitext(config_file)[0]
+    else:
+        run_name = args.model
+    run_name += ["", f"_div{args.div}"][args.add_attention_branch]
+    run_name = f"{run_name}_{now_str}"
+    if args.run_name is not None:
+        run_name = args.run_name
 
     save_dir = os.path.join(args.save_dir, run_name)
     assert not os.path.isdir(save_dir)
@@ -347,19 +360,4 @@ def main():
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    args = parse_args()
-
-    now = datetime.datetime.now()
-    now_str = now.strftime("%Y-%m-%d_%H%M%S")
-
-    if args.model is not None:
-        config_file = os.path.basename(args.config)
-        run_name = os.path.splitext(config_file)[0]
-    else:
-        run_name = args.model
-    run_name += ["", f"_div{args.div}"][args.add_attention_branch]
-    run_name = f"{run_name}_{now_str}"
-    if args.run_name is not None:
-        run_name = args.run_name
-
-    main()
+    main(parse_args())
