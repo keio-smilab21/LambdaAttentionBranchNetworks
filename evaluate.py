@@ -46,33 +46,32 @@ def main(args: argparse.Namespace) -> None:
 
     # データセットの作成
     dataset_params = {"loss_weights": torch.Tensor(args.loss_weights).to(device)}
-    dataloader, model_params, metric, criterion = create_dataloader_dict(
-        args.dataset,
-        args.batch_size,
-        args.image_size,
-        only_test=True,
-        train_ratio=args.train_ratio,
-        dataset_params=dataset_params,
+    dataloader_dict = create_dataloader_dict(
+        args.dataset, args.batch_size, args.image_size, only_test=True
     )
+    dataloader = dataloader_dict["Test"]
     assert isinstance(dataloader, data.DataLoader)
+
+    params = get_parameter_depend_in_data_set(args.dataset)
 
     # モデルの作成
     model = create_model(
         args.model,
-        num_classes=model_params["num_classes"],
+        num_classes=len(params["classes"]),
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,
         attention_branch=args.add_attention_branch,
         division_layer=args.div,
-        multi_task=model_params["is_multi_task"],
-        num_tasks=model_params["num_tasks"],
         theta_attention=args.theta_att,
     )
     assert model is not None, "Model name is invalid"
 
     model.load_state_dict(torch.load(args.pretrained))
     print(f"pretrained {args.pretrained} loaded.")
+
+    criterion = data_params["criterion"]
+    metric = data_params["metric"]
 
     # run_nameをpretrained pathから取得
     # checkpoints/run_name/checkpoint.pt -> run_name
