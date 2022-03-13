@@ -295,7 +295,7 @@ def main(args: argparse.Namespace):
     # モデルの詳細表示（torchsummary）
     summary(model, (args.batch_size, 3, args.image_size, args.image_size))
 
-    lambdas = {"att": args.lambda_att, "var": args.lambda_var}
+    lambdas = {"att": args.lambda_att}
 
     model.to(device)
 
@@ -463,9 +463,6 @@ def parse_args():
 
     parser.add_argument(
         "--lambda_att", type=float, default=0.1, help="weights for attention loss"
-    )
-    parser.add_argument(
-        "--lambda_var", type=float, default=1, help="weights for variance loss"
     )
 
     parser.add_argument(
