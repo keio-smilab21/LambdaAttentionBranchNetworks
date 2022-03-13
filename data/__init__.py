@@ -172,6 +172,9 @@ def get_dataset_params(dataset_name: str) -> Dict[str, Any]:
 
     Returns:
         dict[str, Any]: 平均・分散・クラス名などのパラメータ
+
+    Note:
+        クラス変数としてパラメータをもたせるとクラスを作成する必要があるため関数を作成した
     """
     params = dict()
     # ImageNet
