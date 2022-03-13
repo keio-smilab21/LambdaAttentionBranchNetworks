@@ -15,7 +15,7 @@ from metrics.base import Metric
 import skimage.measure
 
 
-class BlockInsertionDeletion(Metric):
+class PatchInsertionDeletion(Metric):
     def __init__(
         self,
         model: nn.Module,
@@ -23,7 +23,7 @@ class BlockInsertionDeletion(Metric):
         step: int,
         device: torch.device,
         dataset: str,
-        block_size: int = 32,
+        patch_size: int = 32,
     ) -> None:
         self.total = 0
         self.total_insertion = 0
@@ -36,7 +36,7 @@ class BlockInsertionDeletion(Metric):
         self.batch_size = batch_size
         self.step = step
         self.device = device
-        self.block_size = block_size
+        self.patch_size = patch_size
         self.dataset = dataset
 
     def evaluate(
@@ -85,25 +85,25 @@ class BlockInsertionDeletion(Metric):
     def divide_attention_map_into_patch(self):
         assert self.attention is not None
 
-        self.block_attention = skimage.measure.block_reduce(
-            self.attention, (self.block_size, self.block_size), np.max
+        self.patch_attention = skimage.measure.block_reduce(
+            self.attention, (self.patch_size, self.patch_size), np.max
         )
 
     def calculate_attention_order(self):
-        attention_flat = np.ravel(self.block_attention)
+        attention_flat = np.ravel(self.patch_attention)
         # 降順にするためマイナス （reverse）
         order = np.argsort(-attention_flat)
 
         W, H = self.attention.shape
-        block_w, block_h = W // self.block_size, H // self.block_size
+        patch_w, _ = W // self.patch_size, H // self.patch_size
         self.order = np.apply_along_axis(
-            lambda x: map_2d_indices(x, block_w), axis=0, arr=order
+            lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
         )
 
     def generate_insdel_images(self, mode: str):
         W, H = self.attention.shape
-        block_w, block_h = W // self.block_size, H // self.block_size
-        num_insertion = math.ceil(block_w * block_h / self.step)
+        patch_w, patch_h = W // self.patch_size, H // self.patch_size
+        num_insertion = math.ceil(patch_w * patch_h / self.step)
 
         params = get_parameter_depend_in_data_set(self.dataset)
         self.input = np.zeros((num_insertion, 3, W, H))
@@ -113,12 +113,12 @@ class BlockInsertionDeletion(Metric):
             step_index = self.step * (i + 1)
             w_indices = self.order[0, step_index]
             h_indices = self.order[1, step_index]
-            threthold = self.block_attention[w_indices, h_indices]
+            threthold = self.patch_attention[w_indices, h_indices]
 
             if mode == "insertion":
-                mask = np.where(threthold <= self.block_attention, 1, 0)
+                mask = np.where(threthold <= self.patch_attention, 1, 0)
             elif mode == "deletion":
-                mask = np.where(threthold <= self.block_attention, 0, 1)
+                mask = np.where(threthold <= self.patch_attention, 0, 1)
 
             mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
