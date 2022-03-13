@@ -20,10 +20,10 @@ class PatchInsertionDeletion(Metric):
         self,
         model: nn.Module,
         batch_size: int,
+        patch_size: int,
         step: int,
-        device: torch.device,
         dataset: str,
-        patch_size: int = 32,
+        device: torch.device,
     ) -> None:
         self.total = 0
         self.total_insertion = 0
