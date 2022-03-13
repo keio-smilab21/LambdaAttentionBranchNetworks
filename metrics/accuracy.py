@@ -78,27 +78,32 @@ class Accuracy(Metric):
         self.tn = 0
 
 
-def confusion(prediction, truth):
-    """Returns the confusion matrix for the values in the `prediction` and `truth`
-    tensors, i.e. the amount of positions where the values of `prediction`
-    and `truth` are
-    - 1 and 1 (True Positive)
-    - 1 and 0 (False Positive)
-    - 0 and 0 (True Negative)
-    - 0 and 1 (False Negative)
+def confusion(output, target) -> Tuple[int, int, int, int]:
+    """
+    Confusion Matrixの計算
+
+    Args:
+        output(Tensor)  : モデルの出力
+        target(Tensor)  : ラベル
+
+    Returns:
+        true_positive(int) : TPの個数
+        false_positive(int): FPの個数
+        true_negative(int) : TNの個数
+        false_negative(int): FNの個数
     """
 
-    confusion_vector = prediction / truth
-    # Element-wise division of the 2 tensors returns a new tensor which holds a
-    # unique value for each case:
-    #   1     where prediction and truth are 1 (True Positive)
-    #   inf   where prediction is 1 and truth is 0 (False Positive)
-    #   nan   where prediction and truth are 0 (True Negative)
-    #   0     where prediction is 0 and truth is 1 (False Negative)
+    # TP: 1/1 = 1, FP: 1/0 -> inf, TN: 0/0 -> nan, FN: 0/1 -> 0
+    confusion_vector = output / target
 
     true_positives = torch.sum(confusion_vector == 1).item()
     false_positives = torch.sum(confusion_vector == float("inf")).item()
     true_negatives = torch.sum(torch.isnan(confusion_vector)).item()
     false_negatives = torch.sum(confusion_vector == 0).item()
 
-    return true_positives, false_positives, true_negatives, false_negatives
+    return (
+        int(true_positives),
+        int(false_positives),
+        int(true_negatives),
+        int(false_negatives),
+    )
