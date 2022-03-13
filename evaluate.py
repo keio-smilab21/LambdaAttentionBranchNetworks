@@ -8,7 +8,7 @@ import torch.utils.data as data
 from torchinfo import summary
 from tqdm import tqdm
 
-from data import ALL_DATASETS, create_dataloader_dict
+from data import ALL_DATASETS, create_dataloader_dict, get_parameter_depend_in_data_set
 from metrics.base import Metric
 from models import ALL_MODELS, create_model
 from utils.utils import fix_seed, parse_with_config
@@ -45,7 +45,6 @@ def main(args: argparse.Namespace) -> None:
     fix_seed(args.seed, args.no_deterministic)
 
     # データセットの作成
-    dataset_params = {"loss_weights": torch.Tensor(args.loss_weights).to(device)}
     dataloader_dict = create_dataloader_dict(
         args.dataset, args.batch_size, args.image_size, only_test=True
     )
@@ -70,8 +69,8 @@ def main(args: argparse.Namespace) -> None:
     model.load_state_dict(torch.load(args.pretrained))
     print(f"pretrained {args.pretrained} loaded.")
 
-    criterion = data_params["criterion"]
-    metric = data_params["metric"]
+    criterion = params["criterion"]
+    metric = params["metric"]
 
     # run_nameをpretrained pathから取得
     # checkpoints/run_name/checkpoint.pt -> run_name
