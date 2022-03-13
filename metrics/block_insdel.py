@@ -9,94 +9,146 @@ import torch.nn as nn
 import torch.nn.functional as F
 from data import get_parameter_depend_in_data_set
 from utils.utils import reverse_normalize
-from utils.visualize import save_data_as_plot, save_image, save_image_with_attention_map
+from utils.visualize import save_data_as_plot
 
 from metrics.base import Metric
 import skimage.measure
 
 
 class BlockInsertionDeletion(Metric):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        model: nn.Module,
+        batch_size: int,
+        step: int,
+        device: torch.device,
+        dataset: str,
+        block_size: int = 32,
+    ) -> None:
         self.total = 0
         self.total_insertion = 0
         self.total_deletion = 0
-        self.ins_std = 0
-        self.del_std = 0
         self.class_insertion = {}
         self.num_by_classes = {}
         self.class_deletion = {}
 
+        self.model = model
+        self.batch_size = batch_size
+        self.step = step
+        self.device = device
+        self.block_size = block_size
+        self.dataset = dataset
+
     def evaluate(
         self,
-        model: nn.Module,
         image: np.ndarray,
         attention: np.ndarray,
         label: Union[np.ndarray, torch.Tensor],
-        batch_size: int,
-        step: int,
-        device: torch.device,
-        block_size: int = 32,
     ) -> None:
-        self.ins_preds = insertion_deletion(
-            model,
-            image.copy(),
-            attention.copy(),
-            batch_size,
-            label,
-            mode="insertion",
-            step=step,
-            device=device,
-            block_size=block_size,
-            image_id=self.total,
-        )
+        self.image = image.copy()
+        self.label = int(label.item())
 
-        ins_label = sigmoid_linspace(self.ins_preds.shape[0])
-        del_label = list(map(lambda x: 2 - 2 * x, ins_label))
+        # image (C, W, H), attention (1, W', H') -> attention (W, H)
+        self.attention = attention
+        if not (self.image.shape[1:] == attention.shape):
+            self.attention = cv2.resize(
+                attention[0], dsize=(self.image.shape[1], self.image.shape[2])
+            )
 
-        self.ins_std += np.abs(self.ins_preds - ins_label).sum()
+        # attentionをパッチにしてパッチの順位を計算
+        self.divide_attention_map_into_patch()
+        self.calculate_attention_order()
 
+        # insertion用の入力を作成してinference
+        self.generate_insdel_images(mode="insertion")
+        self.ins_preds = self.inference()  # for plot
         self.ins_auc = auc(self.ins_preds)
         self.total_insertion += self.ins_auc
-        self.correct = self.ins_preds[-1] > 0.5
 
-        label_int = label.item()
-        if not label_int in self.class_insertion:
-            self.class_insertion[label_int] = self.ins_auc
-            self.num_by_classes[label_int] = 1
-        else:
-            self.class_insertion[label_int] += self.ins_auc
-            self.num_by_classes[label_int] += 1
-
-        self.del_preds = insertion_deletion(
-            model,
-            image.copy(),
-            attention.copy(),
-            batch_size,
-            label,
-            mode="deletion",
-            step=step,
-            device=device,
-            block_size=block_size,
-            image_id=self.total,
-        )
+        # deletion
+        self.generate_insdel_images(mode="deletion")
+        self.del_preds = self.inference()
         self.del_auc = auc(self.del_preds)
         self.total_deletion += self.del_auc
-        self.del_std += np.abs(self.del_preds - del_label).sum()
 
-        if not label_int in self.class_deletion:
-            self.class_deletion[label_int] = self.del_auc
-        else:
-            self.class_deletion[label_int] += self.del_auc
+        # クラスごとのサンプル数 / insdelスコアの集計
+        self.num_by_classes.setdefault(self.label, 0)
+        self.class_insertion.setdefault(self.label, 0)
+        self.class_deletion.setdefault(self.label, 0)
+
+        self.num_by_classes[self.label] += 1
+        self.class_insertion[self.label] += self.ins_auc
+        self.class_deletion[self.label] += self.del_auc
 
         self.total += 1
+
+    def divide_attention_map_into_patch(self):
+        assert self.attention is not None
+
+        self.block_attention = skimage.measure.block_reduce(
+            self.attention, (self.block_size, self.block_size), np.max
+        )
+
+    def calculate_attention_order(self):
+        attention_flat = np.ravel(self.block_attention)
+        # 降順にするためマイナス （reverse）
+        order = np.argsort(-attention_flat)
+
+        W, H = self.attention.shape
+        block_w, block_h = W // self.block_size, H // self.block_size
+        self.order = np.apply_along_axis(
+            lambda x: map_2d_indices(x, block_w), axis=0, arr=order
+        )
+
+    def generate_insdel_images(self, mode: str):
+        W, H = self.attention.shape
+        block_w, block_h = W // self.block_size, H // self.block_size
+        num_insertion = math.ceil(block_w * block_h / self.step)
+
+        params = get_parameter_depend_in_data_set(self.dataset)
+        self.input = np.zeros((num_insertion, 3, W, H))
+        image = reverse_normalize(self.image.copy(), params["mean"], params["std"])
+
+        for i in range(num_insertion):
+            step_index = self.step * (i + 1)
+            w_indices = self.order[0, step_index]
+            h_indices = self.order[1, step_index]
+            threthold = self.block_attention[w_indices, h_indices]
+
+            if mode == "insertion":
+                mask = np.where(threthold <= self.block_attention, 1, 0)
+            elif mode == "deletion":
+                mask = np.where(threthold <= self.block_attention, 0, 1)
+
+            mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+
+            self.input[i, 0] = (image[0] * mask - params["mean"][0]) / params["std"][0]
+            self.input[i, 1] = (image[1] * mask - params["mean"][1]) / params["std"][1]
+            self.input[i, 2] = (image[2] * mask - params["mean"][2]) / params["std"][2]
+
+    def inference(self):
+        inputs = torch.Tensor(self.input)
+
+        num_iter = math.ceil(inputs.size(0) / self.batch_size)
+        result = torch.zeros(0)
+
+        for iter in range(num_iter):
+            start = self.batch_size * iter
+            inputs = inputs[start : start + self.batch_size].to(self.device)
+
+            outputs = self.model(inputs)
+
+            outputs = F.softmax(outputs, 1)
+            outputs = outputs[:, self.label]
+            result = torch.cat([result, outputs.cpu().detach()], dim=0)
+
+        return np.nan_to_num(result)
 
     def score(self) -> Dict[str, float]:
         return {
             "Insertion": self.insertion(),
             "Deletion": self.deletion(),
             "PID": self.insertion() - self.deletion(),
-            "ins_std": self.ins_std / self.total,
-            "del_std": self.del_std / self.total,
         }
 
     def log(self) -> str:
@@ -150,157 +202,6 @@ class BlockInsertionDeletion(Metric):
         del_abnormal = self.class_deletion[1] / num_abnormal
 
         return f"{ins_normal}\t{ins_abnormal}\t{self.insertion()}\t{del_normal}\t{del_abnormal}\t{self.deletion()}"
-        return f"{self.insertion()}\t{self.deletion()}"
-
-
-def sigmoid_linspace(n: int):
-    x = list(range(n))
-    y = list(map(lambda x: 1 / (1 + math.exp(-x)), x))
-    return y
-
-
-def generate_insdel_images(
-    image: Union[np.ndarray, torch.Tensor],
-    attention: Union[np.ndarray, torch.Tensor],
-    mode: str,
-    step: int = 10,
-    block_size: int = 32,
-) -> np.ndarray:
-    """
-    insertion / deletion用の画像を作成
-
-    Args:
-        image (array)   : 画像
-        attention(array): アテンションマップ
-        mode(str)       : insertion / deletion
-        step(int)       : 高い順にいくつずつ足す/消していくか
-
-    Returns:
-        np.ndarray: (N, C, H, W)
-                    N = ceil(W * H / step)
-                    バッチが各段階に対応
-    """
-    # numpy配列に統一
-    if isinstance(attention, torch.Tensor):
-        attention = attention.cpu().detach().numpy()
-    if isinstance(image, torch.Tensor):
-        image: np.ndarray = image.cpu().detach().numpy()
-
-    # image (C, W, H), attention (C, W', H') のとき attention (W, H)に変換
-    if not (image.shape[1:] == attention.shape):
-        attention = cv2.resize(attention[0], dsize=(image.shape[1], image.shape[2]))
-
-    W, H = attention.shape
-    block_w, block_h = W // block_size, H // block_size
-
-    # block_attention = cv2.resize(
-    #     attention, dsize=(block_w, block_h), interpolation=cv2.INTER_AREA
-    # )
-    block_attention = skimage.measure.block_reduce(
-        attention, (block_size, block_size), np.max
-    )
-    attention_flat = np.ravel(block_attention)
-    # argsortにはreverseがないが降順にしたいためマイナス付与
-    order = np.argsort(-attention_flat)
-    order = np.apply_along_axis(lambda x: map_2d_indices(x, block_w), axis=0, arr=order)
-
-    num_insertion = math.ceil(block_w * block_h // step)
-
-    # insertionはresultに足していく
-    # deletionはresult <- image <- zero
-    params = get_parameter_depend_in_data_set("IDRiD")
-    result = np.zeros((num_insertion, 3, W, H))
-
-    image = reverse_normalize(image, params["mean"], params["std"])
-    # result = (result - params["mean"]) / params["std"]
-
-    image_id = np.random.rand(1)
-    for i in range(num_insertion):
-        # step_index = min(block_w * block_h - 1, step * (i + 1))
-        step_index = step * (i + 1)
-        w_indices = order[0, step_index]
-        h_indices = order[1, step_index]
-        threthold = block_attention[w_indices, h_indices]
-
-        if mode == "insertion":
-            mask = np.where(threthold <= block_attention, 1, 0)
-            # assert np.sum(mask) == i + 1, "2 mask is added"
-        elif mode == "deletion":
-            mask = np.where(threthold <= block_attention, 0, 1)
-
-        mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-
-        result[i, 0] = (image[0].copy() * mask - params["mean"][0]) / params["std"][0]
-        result[i, 1] = (image[1].copy() * mask - params["mean"][1]) / params["std"][1]
-        result[i, 2] = (image[2].copy() * mask - params["mean"][2]) / params["std"][2]
-
-        # save_image(result[i], f"tmp/{mode}_{i}.png", params["mean"], params["std"])
-
-    return result
-
-
-def insertion_deletion(
-    model: nn.Module,
-    image: Union[np.ndarray, torch.Tensor],
-    attention: np.ndarray,
-    batch_size: int,
-    label: Union[np.ndarray, torch.Tensor],
-    mode: str,
-    step: int,
-    device: torch.device,
-    block_size: int,
-    image_id: int,
-) -> np.ndarray:
-    """
-    insertion / deletionを実行
-
-    Args:
-        model (Module)  : 推論を行うモデル
-        image (array)   : 画像
-        attention(array): アテンションマップ
-        batch_size(int) : バッチサイズ
-        label(array)    : ラベル
-        mode(str)       : insertion / deletion
-        step(int)       : 高い順にいくつずつ足す/消していくか
-        device(device)  : CPU / GPU
-
-    Returns:
-        np.ndarray: 各stepでの予測確率
-    """
-    insertion_images = generate_insdel_images(
-        image, attention, mode, step=step, block_size=block_size
-    )
-    insertion_images = torch.Tensor(insertion_images)
-
-    num_iter = math.ceil(insertion_images.size(0) / batch_size)
-    result = torch.zeros(0)
-
-    for iter in range(num_iter):
-        start = batch_size * iter
-        inputs = insertion_images[start : start + batch_size].to(device)
-
-        outputs = model(inputs)
-
-        outputs = F.softmax(outputs, 1)
-        outputs = outputs[:, label]
-        # result = torch.hstack((result, outputs.cpu().detach()))
-        result = torch.cat([result, outputs.cpu().detach()], dim=0)
-
-    params = get_parameter_depend_in_data_set("magnetogram")
-    # for i, image in enumerate(insertion_images):
-    #     save_image(
-    #         image.cpu().numpy(),
-    #         f"tmp/{image_id}_{mode}{i}.png",
-    #         mean=params["mean"],
-    #         std=params["std"],
-    #     )
-    #     save_data_as_plot(
-    #         result[: i + 1].cpu().numpy(),
-    #         f"tmp/{image_id}_AUC_{mode}{i}.png",
-    #         label=f"$p(y = {label})$ = {result[i]:.4f}",
-    #         xlim=result.size(0),
-    #     )
-    return np.nan_to_num(result)
 
 
 def map_2d_indices(indices_1d: int, width: int):
