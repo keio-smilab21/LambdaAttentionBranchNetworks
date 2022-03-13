@@ -99,7 +99,7 @@ def create_dataset(
     Returns:
         data.Dataset : pytorchデータセット
     """
-
+    assert dataset_name in ALL_DATASETS
     params = get_parameter_depend_in_data_set(dataset_name)
 
     if transform is None:
