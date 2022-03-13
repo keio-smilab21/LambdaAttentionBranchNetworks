@@ -184,7 +184,6 @@ class BlockInsertionDeletion(Metric):
         self.del_preds = None
 
     def save_roc_curve(self, save_dir: str) -> None:
-        scores = self.score()
         ins_fname = os.path.join(save_dir, f"{self.total}_insertion.png")
         save_data_as_plot(self.ins_preds, ins_fname, label=f"AUC = {self.ins_auc:.4f}")
 
