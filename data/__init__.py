@@ -162,6 +162,7 @@ def get_parameter_depend_in_data_set(
     params["root"] = dataset_root
 
     if dataset_name == "IDRiD":
+        params["name"] = "IDRiD"
         params["dataset"] = IDRiDDataset
         params["mean"] = (0.4329, 0.2094, 0.0687)
         params["std"] = (0.3083, 0.1643, 0.0829)
