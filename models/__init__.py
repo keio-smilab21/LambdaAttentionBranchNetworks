@@ -60,8 +60,6 @@ def create_model(
     pretrained_path: Optional[str] = None,
     attention_branch: bool = False,
     division_layer: Optional[str] = None,
-    multi_task: bool = False,
-    num_tasks: Optional[List[int]] = None,
     theta_attention: float = 0,
 ) -> Optional[nn.Module]:
     """
@@ -76,29 +74,15 @@ def create_model(
                                 （アテンションブランチ化などをした後のモデルのもの）
         attention_branch(bool): アテンションブランチ化するか
         division_layer(str)   : いくつめのlayerで分割してattentionbranchを導入するか
-        multi_task(bool)      : マルチタスク化するか
-        num_tasks(List[int])  : 各タスクのクラス数，タスク数はlen(num_tasks)
-                                全部別にしたい場合[1, 1, ...] (Note参照)
         theta_attention(float): Attention Branch入力時の閾値
                                 この値よりattentionが低いピクセルを0にして入力
 
     Returns:
         nn.Module: 作成したモデル
-
-    Note:
-        マルチタスクはマルチラベル（ex: 画像中に複数物体が含まれる）なnクラス分類問題に使用
-        ABNで各クラスごとにattentionを得るためにはマルチタスク化 = 複数のPerception Branchが必要
-
-        全クラスごとにPerception Branchを用意すると重くなるため，あるクラスのみ分けたい際にnum_tasksを使用
-        例えば20クラスのうち10番目のみ分けたい場合 num_tasks=[9, 1, 10]とすると
-        Perception Branchがlen(num_tasks) = 3個でき，クラス数1のPerceptionは10番目に特化している
-        10番目にのみ特化したattentionを得ることが可能
-
-        そのため，multi_taskはattention_branch = Trueの際に使用されることを想定
     """
+    # base modelの作成
     if base_model == "lambda_resnet":
         model = lambda_resnet50()
-
         layer_index = {"layer1": -6, "layer2": -5, "layer3": -4}
         # コードを直接変更してnn.flattenにしているためFalse
         add_flatten = False
@@ -120,12 +104,8 @@ def create_model(
         model.load_state_dict(torch.load(base_pretrained))
         print(f"base pretrained {base_pretrained} loaded.")
 
-    if multi_task:
-        assert attention_branch, "multi_taskはattention_branch = Trueを想定"
-        # multi_taskのときはLinear: R^d -> 1をタスク数分使うため最終層の出力次元は1
-        model = change_num_classes(model, 1, add_flatten)
-    else:
-        model = change_num_classes(model, num_classes, add_flatten)
+    # 最終層の出力をnum_classに変換
+    model = change_num_classes(model, num_classes, add_flatten)
 
     # base_pretrained2がpathならば読み込み
     if base_pretrained2 is not None and os.path.isfile(base_pretrained2):
@@ -138,8 +118,6 @@ def create_model(
             model,
             layer_index[division_layer],
             num_classes,
-            multi_task,
-            num_tasks,
             theta_attention,
         )
 

@@ -238,84 +238,10 @@ class AttentionBranchModel(nn.Module):
         return self.perception_branch(x)
 
 
-class MultiTaskAttentionBranchModel(AttentionBranchModel):
-    def __init__(
-        self,
-        feature_extractor: nn.Module,
-        perception_branch: nn.Module,
-        block: nn.Module = Bottleneck,
-        num_layer: int = 2,
-        num_classes: int = 1000,
-        inplanes: int = 64,
-        num_tasks: Optional[List[int]] = None,
-    ) -> None:
-        super().__init__(
-            feature_extractor,
-            perception_branch,
-            block,
-            num_layer,
-            num_classes,
-            inplanes,
-        )
-
-        if num_tasks is None:
-            num_tasks = [1 for _ in range(num_classes)]
-        assert num_classes == sum(num_tasks)
-
-        self.attention_branch = AttentionBranch(
-            block,
-            num_layer,
-            num_classes,
-            inplanes,
-            multi_task=True,
-            num_tasks=num_tasks,
-        )
-
-        self.perception_branch = perception_branch
-
-        perception_modules = list(self.perception_branch.children())
-        final_layer = perception_modules[-1]
-        assert isinstance(final_layer, nn.Linear)
-
-        # 最終層以外をPerceptionにして，最終層はModuleListでタスク数分作成
-        self.perception_branch = nn.Sequential(*perception_modules[:-1])
-
-        self.final_layers = nn.ModuleList(
-            [nn.Linear(final_layer.in_features, num_task) for num_task in num_tasks]
-        )
-
-    def forward(self, x):
-        self.feature = self.feature_extractor(x)
-
-        # For Attention Loss
-        self.attention_pred = self.attention_branch(self.feature)
-
-        batch_size, num_channel, H, W = self.attention_branch.attention.size()
-        # attentionのチャンネル数 = タスク数で，チャネルiがタスクiのアテンションになる
-
-        preds = torch.zeros((batch_size, 0)).to(x.device)
-
-        for i, final_layer in enumerate(self.final_layers):
-            attention = self.attention_branch.attention[:, i, ...].reshape(-1, 1, H, W)
-
-            attention_x = self.feature * attention
-            x = attention_x + self.feature
-
-            x = self.perception_branch(x)
-
-            x = final_layer(x)
-
-            preds = torch.hstack((preds, x))
-
-        return preds
-
-
 def add_attention_branch(
     base_model: nn.Module,
     division_index: int,
     num_classes: int,
-    multi_task: bool = False,
-    num_tasks: Optional[List[int]] = None,
     theta_attention: float = 0,
 ) -> nn.Module:
     """
@@ -347,16 +273,6 @@ def add_attention_branch(
             inplanes = module.out_channels
             break
 
-    if multi_task:
-        return MultiTaskAttentionBranchModel(
-            pre_model,
-            post_model,
-            Bottleneck,
-            2,
-            num_classes,
-            inplanes=inplanes,
-            num_tasks=num_tasks,
-        )
     return AttentionBranchModel(
         pre_model,
         post_model,
