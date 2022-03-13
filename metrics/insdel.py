@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from data import get_dataset_params
+from data import get_parameter_depend_in_data_set
 from utils.visualize import save_data_as_plot, save_image
 
 from metrics.base import Metric
@@ -170,7 +170,7 @@ def generate_insdel_images(
     # insertionはresultに足していく
     # deletionはresult <- image <- zero
     result = np.zeros((num_insertion, 3, W, H))
-    params = get_dataset_params("magnetogram")
+    params = get_parameter_depend_in_data_set("magnetogram")
     zero_image = np.zeros((3, W, H))
 
     for i in range(num_insertion):

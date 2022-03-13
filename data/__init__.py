@@ -105,7 +105,7 @@ def create_dataset(
         data.Dataset : pytorchデータセット
     """
 
-    params = get_dataset_params(dataset_name)
+    params = get_parameter_depend_in_data_set(dataset_name)
 
     if transform is None:
         if image_set == "train":
@@ -145,7 +145,7 @@ def create_dataset(
     return dataset
 
 
-def get_dataset_params(dataset_name: str) -> Dict[str, Any]:
+def get_parameter_depend_in_data_set(dataset_name: str) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
 

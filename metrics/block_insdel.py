@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from data import get_dataset_params
+from data import get_parameter_depend_in_data_set
 from utils.utils import reverse_normalize
 from utils.visualize import save_data_as_plot, save_image, save_image_with_attention_map
 
@@ -208,7 +208,7 @@ def generate_insdel_images(
 
     # insertionはresultに足していく
     # deletionはresult <- image <- zero
-    params = get_dataset_params("IDRiD")
+    params = get_parameter_depend_in_data_set("IDRiD")
     result = np.zeros((num_insertion, 3, W, H))
 
     image = reverse_normalize(image, params["mean"], params["std"])
@@ -286,7 +286,7 @@ def insertion_deletion(
         # result = torch.hstack((result, outputs.cpu().detach()))
         result = torch.cat([result, outputs.cpu().detach()], dim=0)
 
-    params = get_dataset_params("magnetogram")
+    params = get_parameter_depend_in_data_set("magnetogram")
     # for i, image in enumerate(insertion_images):
     #     save_image(
     #         image.cpu().numpy(),

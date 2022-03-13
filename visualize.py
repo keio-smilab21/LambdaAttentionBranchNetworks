@@ -10,7 +10,7 @@ from torchinfo import summary
 from tqdm import tqdm
 import wandb
 
-from data import ALL_DATASETS, get_dataset_params, setting_dataset
+from data import ALL_DATASETS, get_parameter_depend_in_data_set, setting_dataset
 from metrics.base import Metric
 from metrics.insdel import InsertionDeletion
 from metrics.block_insdel import BlockInsertionDeletion
@@ -151,7 +151,7 @@ def main() -> None:
         args.dataset, 1, args.image_size, is_test=True, dataset_params=dataset_params
     )
     assert isinstance(dataloader, data.DataLoader)
-    params = get_dataset_params(args.dataset)
+    params = get_parameter_depend_in_data_set(args.dataset)
 
     mask_path = os.path.join(args.root_dir, "masks.npy")
     if not os.path.isfile(mask_path):

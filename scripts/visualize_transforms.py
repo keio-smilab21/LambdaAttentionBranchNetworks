@@ -5,7 +5,7 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from data import ALL_DATASETS, get_dataset_params, setting_dataset
+from data import ALL_DATASETS, get_parameter_depend_in_data_set, setting_dataset
 from utils.utils import fix_seed, reverse_normalize
 
 
@@ -30,7 +30,7 @@ def main():
     fix_seed(args.seed, True)
 
     dataloader, _, _, _ = setting_dataset(args.dataset, 1, args.image_size)
-    params = get_dataset_params(args.dataset)
+    params = get_parameter_depend_in_data_set(args.dataset)
 
     save_dir = os.path.join(args.root_dir, "transforms")
     if not os.path.isdir(save_dir):
