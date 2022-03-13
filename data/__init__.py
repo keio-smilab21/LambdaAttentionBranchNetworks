@@ -25,7 +25,7 @@ def create_dataloader_dict(
         batch_size  (int) : バッチサイズ
         image_size  (int) : 画像サイズ
         only_test   (bool): テストデータセットのみ作成
-        train_ratio(float): valがないとき，train / valの分割割合
+        train_ratio(float): valがないとき, train / valの分割割合
 
     Returns:
         dataloader_dict : データローダーのdict
