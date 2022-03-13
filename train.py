@@ -22,8 +22,8 @@ from models.attention_branch import Bottleneck as ABNBottleneck
 from models.lambda_resnet import Bottleneck as LambdaBottleneck
 from optim import ALL_OPTIM, create_optimizer
 from optim.sam import SAM
-from utils.utils import fix_seed, module_generator, save_json, parse_with_config
 from utils.loss import calclurate_loss
+from utils.utils import fix_seed, module_generator, parse_with_config, save_json
 from utils.visualize import save_attention_map
 
 
@@ -180,7 +180,7 @@ def train(
     model: nn.Module,
     criterion: nn.modules.loss._Loss,
     optimizer: optim.Optimizer,
-    metrics: Metric,
+    metric: Metric,
     lambdas: Optional[Dict[str, float]] = None,
 ) -> Tuple[float, Metric]:
     total = 0
@@ -196,7 +196,7 @@ def train(
         loss = calclurate_loss(criterion, outputs, labels, model, lambdas)
         loss.backward()
         total_loss += loss.item()
-        metrics.evaluate(outputs, labels)
+        metric.evaluate(outputs, labels)
 
         # OptimizerがSAMのとき2回backwardする
         if isinstance(optimizer, SAM):
@@ -210,7 +210,7 @@ def train(
         total += labels.size(0)
 
     train_loss = total_loss / total
-    return train_loss, metrics
+    return train_loss, metric
 
 
 def main(args: argparse.Namespace):
@@ -226,14 +226,14 @@ def main(args: argparse.Namespace):
         args.image_size,
         train_ratio=args.train_ratio,
     )
-    params = get_parameter_depend_in_data_set(
+    data_params = get_parameter_depend_in_data_set(
         args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device)
     )
 
     # モデルの作成
     model = create_model(
         args.model,
-        num_classes=len(params["classes"]),
+        num_classes=len(data_params["classes"]),
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,
@@ -265,6 +265,10 @@ def main(args: argparse.Namespace):
         verbose=True,
     )
 
+    criterion = data_params["criterion"]
+    metric = data_params["metric"]
+
+    # run_name の 作成 (for save_dir / wandb)
     if args.model is not None:
         config_file = os.path.basename(args.config)
         run_name = os.path.splitext(config_file)[0]
@@ -281,7 +285,7 @@ def main(args: argparse.Namespace):
     best_path = os.path.join(save_dir, f"best.pt")
 
     configs = vars(args)
-    configs.pop("config")
+    configs.pop("config")  # モデルと一緒に保存するargsを適用した新configに旧configの情報が入らないように
 
     early_stopping = EarlyStopping(
         patience=args.early_stopping_patience, save_dir=save_dir
@@ -304,29 +308,29 @@ def main(args: argparse.Namespace):
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
                 dataloader.dataset.dataset.model = model
-                loss, metrics = train(
+                loss, metric = train(
                     dataloader,
                     model,
                     criterion,
                     optimizer,
-                    metrics,
+                    metric,
                     lambdas=lambdas,
                 )
             else:
-                loss, metrics = test(
+                loss, metric = test(
                     dataloader,
                     model,
                     criterion,
-                    metrics,
+                    metric,
                     device,
                     phase,
                     lambdas=lambdas,
                 )
 
-            metric_log = metrics.log()
+            metric_log = metric.log()
             log = f"{phase}\t| {metric_log} Loss: {loss:.5f} "
 
-            wandb_log(loss, metrics, phase)
+            wandb_log(loss, metric, phase)
 
             if phase == "Val":
                 early_stopping_log = early_stopping(loss, model)
@@ -334,7 +338,7 @@ def main(args: argparse.Namespace):
                 scheduler.step(loss)
 
             print(log)
-            metrics.clear()
+            metric.clear()
             if args.add_attention_branch:
                 save_attention_map(
                     model.attention_branch.attention[0][0], "attention.png"
@@ -476,9 +480,7 @@ def parse_args():
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
     )
 
-    args = parse_with_config(parser)
-
-    return args
+    return parse_with_config(parser)
 
 
 if __name__ == "__main__":
