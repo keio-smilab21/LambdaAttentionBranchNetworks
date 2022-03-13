@@ -11,7 +11,7 @@ from tqdm import tqdm
 from data import ALL_DATASETS, create_dataloader_dict
 from metrics.base import Metric
 from models import ALL_MODELS, create_model
-from utils.utils import fix_seed
+from utils.utils import fix_seed, parse_with_config
 from utils.loss import calculate_loss
 
 
@@ -41,7 +41,7 @@ def test(
     return test_loss, metrics
 
 
-def main() -> None:
+def main(args: argparse.Namespace) -> None:
     fix_seed(args.seed, args.no_deterministic)
 
     # データセットの作成
@@ -91,9 +91,7 @@ def main() -> None:
     print(f"Test\t| {metric_log} Loss: {loss:.5f}")
 
 
-if __name__ == "__main__":
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-c", "--config", type=str, help="path to config file (json)")
@@ -141,6 +139,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--root_dir", type=str, default="./outputs/")
 
-    args = parse_with_config(parser)
+    return parse_with_config(parser)
 
-    main()
+
+if __name__ == "__main__":
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    main(parse_args())
