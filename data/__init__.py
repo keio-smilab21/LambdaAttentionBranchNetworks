@@ -10,7 +10,7 @@ from data.IDRID import IDRiDDataset
 ALL_DATASETS = ["IDRiD"]
 
 
-def setting_dataset(
+def create_dataloader_dict(
     dataset_name: str,
     batch_size: int,
     image_size: int = 224,
@@ -18,7 +18,7 @@ def setting_dataset(
     train_ratio: float = 0.9,
 ) -> Dict[str, data.DataLoader]:
     """
-    データセット名からデータローダー・評価指標・ロスの作成
+    データローダーの作成
 
     Args:
         dataset_name(str) : データセット名
