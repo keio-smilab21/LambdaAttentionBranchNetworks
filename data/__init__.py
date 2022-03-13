@@ -4,11 +4,14 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from metrics.accuracy import Accuracy
+from metrics.flare import FlareMetric
 from torch import nn
 
 from data.IDRID import IDRiDDataset
+from data.magnetogram import Magnetogram
+from data.sampler import BalancedBatchSampler
 
-ALL_DATASETS = ["IDRiD"]
+ALL_DATASETS = ["IDRiD", "magnetogram"]
 
 
 def create_dataloader_dict(
@@ -65,7 +68,7 @@ def create_dataloader_dict(
         train_dataset, val_dataset = data.random_split(
             train_dataset, [train_size, val_size]
         )
-        val_dataset.transform = test_dataset.transform
+    val_dataset.transform = test_dataset.transform
 
     train_dataloader = data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
@@ -133,7 +136,10 @@ def create_dataset(
 
     if params["has_params"]:
         dataset = params["dataset"](
-            root="./datasets", image_set=image_set, transform=transform, params=params
+            root="./datasets",
+            image_set=image_set,
+            params=params,
+            transform=transform,
         )
     else:
         dataset = params["dataset"](
@@ -161,14 +167,15 @@ def get_parameter_depend_in_data_set(
         クラス変数としてパラメータをもたせるとクラスを作成する必要があるため関数を作成した
     """
     params = dict()
+    params["name"] = dataset_name
+    params["root"] = dataset_root
+    params["has_params"] = False
+    params["num_channel"] = 3
     # ImageNet
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
-    params["root"] = dataset_root
-    params["has_params"] = False
 
     if dataset_name == "IDRiD":
-        params["name"] = "IDRiD"
         params["dataset"] = IDRiDDataset
         params["mean"] = (0.4329, 0.2094, 0.0687)
         params["std"] = (0.3083, 0.1643, 0.0829)
@@ -176,6 +183,22 @@ def get_parameter_depend_in_data_set(
         params["has_val"] = False
 
         params["metric"] = Accuracy()
+        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    elif dataset_name == "magnetogram":
+        params["dataset"] = Magnetogram
+        params["num_channel"] = 1
+        params["mean"] = 0.3625
+        params["std"] = 0.2234
+        params["classes"] = ("OC", "MX")
+        params["has_val"] = True
+        params["has_params"] = True
+        params["years"] = {
+            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
+            "val": ["2016"],
+            "test": ["2017"],
+        }
+
+        params["metric"] = FlareMetric()
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     return params
