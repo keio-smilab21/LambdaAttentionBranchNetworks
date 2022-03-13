@@ -18,11 +18,8 @@ def setting_dataset(
     is_test: bool = False,
     train_ratio: float = 0.9,
     dataset_params: Optional[Dict[str, Any]] = None,
-    model=None,
-    device=None,
 ) -> Tuple[
     Union[data.DataLoader, Dict[str, data.DataLoader]],
-    Dict[str, Any],
     Metric,
     nn.modules.loss._Loss,
 ]:
@@ -41,23 +38,13 @@ def setting_dataset(
         (Union[data.Dataloader, dict[str, data.Dataloader]])
         metrics     : 評価指標
         criterion   : ロス関数
-        model_params: モデルのパラメータ
-
-    Note:
-        model_paramsはnum_classesなどデータセットに依存するパラメータ
     """
     train_dataset = create_dataset(
         dataset_name,
         "train",
         image_size,
-        model=model,
-        device=device,
-        batch_size=batch_size,
     )
     test_dataset = create_dataset(dataset_name, "test", image_size)
-
-    ## データセットに依存するモデル作成用パラメータを設定
-    model_params = {"is_multi_task": False, "num_tasks": None}
 
     if dataset_name == "IDRiD":
         metrics = Accuracy()
@@ -74,7 +61,6 @@ def setting_dataset(
             train_dataset, [train_size, val_size]
         )
         val_dataset.transform = test_dataset.transform
-        model_params["num_classes"] = 2
     else:
         raise ValueError()
 
@@ -83,7 +69,7 @@ def setting_dataset(
     )
 
     if is_test:
-        return test_dataloader, model_params, metrics, criterion
+        return test_dataloader, metrics, criterion
 
     train_dataloader = data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
@@ -96,17 +82,13 @@ def setting_dataset(
         "Test": test_dataloader,
     }
 
-    return dataloader_dict, model_params, metrics, criterion
+    return dataloader_dict, metrics, criterion
 
 
 def create_dataset(
     dataset_name: str,
     image_set: str = "train",
     image_size: int = 224,
-    theta_attetion: float = 0.5,
-    model=None,
-    device=None,
-    batch_size=None,
     transform: Optional[Callable] = None,
 ) -> data.Dataset:
     """
