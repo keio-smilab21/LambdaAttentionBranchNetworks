@@ -32,7 +32,6 @@ def calculate_attention(
     if method == "ABN":
         assert isinstance(model, AttentionBranchModel)
         y = model(image)
-        # print(torch.argmax(y[0]), label)
         attentions = model.attention_branch.attention  # (1, W, W)
         attention = attentions[0]
         attention: np.ndarray = attention.cpu().numpy()
