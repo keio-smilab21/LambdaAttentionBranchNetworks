@@ -77,42 +77,6 @@ class Accuracy(Metric):
         self.tn = 0
 
 
-class MultiLabelAccuracy(Metric):
-    def __init__(self) -> None:
-        self.total_acc_counts = 0
-        self.binary_acc_counts = 0
-        self.total = 0
-
-    def evaluate(self, preds: torch.Tensor, labels: torch.Tensor) -> None:
-        preds = torch.sigmoid(preds)
-        preds = 1 * (preds > 0.5)
-        num_classes = labels.size(1)
-        num_collects = preds.eq(labels).sum(1)
-        num_collects = num_collects.to(torch.float64)
-
-        all_collects = num_collects // num_classes
-        ratio_collects = num_collects / num_classes
-
-        self.total_acc_counts += all_collects.sum(0)
-        self.binary_acc_counts += ratio_collects.sum(0)
-        self.total += labels.size(0)
-
-    def score(self) -> Dict[str, float]:
-        scores = {"Total Acc": self.total_acc(), "Binary Acc": self.binary_acc()}
-        return scores
-
-    def binary_acc(self) -> float:
-        return self.binary_acc_counts / self.total
-
-    def total_acc(self) -> float:
-        return self.total_acc_counts / self.total
-
-    def clear(self) -> None:
-        self.total_acc_counts = 0
-        self.binary_acc_counts = 0
-        self.total = 0
-
-
 def confusion(prediction, truth):
     """Returns the confusion matrix for the values in the `prediction` and `truth`
     tensors, i.e. the amount of positions where the values of `prediction`
