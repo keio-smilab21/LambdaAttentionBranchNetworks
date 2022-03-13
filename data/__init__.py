@@ -131,9 +131,14 @@ def create_dataset(
                 ]
             )
 
-    dataset = params["dataset"](
-        root="./datasets", image_set=image_set, transform=transform, params=params
-    )
+    if params["has_params"]:
+        dataset = params["dataset"](
+            root="./datasets", image_set=image_set, transform=transform, params=params
+        )
+    else:
+        dataset = params["dataset"](
+            root="./datasets", image_set=image_set, transform=transform
+        )
 
     return dataset
 
@@ -160,6 +165,7 @@ def get_parameter_depend_in_data_set(
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
     params["root"] = dataset_root
+    params["has_params"] = False
 
     if dataset_name == "IDRiD":
         params["name"] = "IDRiD"
