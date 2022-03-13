@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional
 
+import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from metrics.accuracy import Accuracy
@@ -138,7 +139,9 @@ def create_dataset(
 
 
 def get_parameter_depend_in_data_set(
-    dataset_name: str, pos_weight: float = 1, dataset_root: str = "./datasets"
+    dataset_name: str,
+    pos_weight: torch.Tensor = torch.Tensor([1]),
+    dataset_root: str = "./datasets",
 ) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
