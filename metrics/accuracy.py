@@ -5,7 +5,7 @@ import torch
 from metrics.base import Metric
 
 
-def num_accuracy(
+def num_correct_topk(
     output: torch.Tensor, target: torch.Tensor, topk: Tuple[int] = (1,)
 ) -> List[int]:
     """
@@ -47,7 +47,7 @@ class Accuracy(Metric):
 
     def evaluate(self, preds: torch.Tensor, labels: torch.Tensor) -> None:
         self.total += labels.size(0)
-        self.correct += num_accuracy(preds, labels)[0]
+        self.correct += num_correct_topk(preds, labels)[0]
 
         preds = torch.max(preds, dim=-1)[1]
         tp, fp, tn, fn = confusion(preds, labels)
