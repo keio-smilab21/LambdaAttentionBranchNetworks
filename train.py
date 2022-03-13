@@ -13,7 +13,7 @@ from torchinfo import summary
 from torchvision.models.resnet import Bottleneck as TorchBottleneck
 from tqdm import tqdm
 
-from data import ALL_DATASETS, create_dataloader_dict
+from data import ALL_DATASETS, create_dataloader_dict, get_parameter_depend_in_data_set
 from evaluate import test
 from metrics.base import Metric
 from models import ALL_MODELS, create_model
@@ -220,27 +220,25 @@ def main(args: argparse.Namespace):
     fix_seed(args.seed, args.no_deterministic)
 
     # データセットの作成
-    dataset_params = {"loss_weights": torch.Tensor(args.loss_weights).to(device)}
-    dataloader_dict, model_params, metrics, criterion, = create_dataloader_dict(
+    dataloader_dict = create_dataloader_dict(
         args.dataset,
         args.batch_size,
         args.image_size,
         train_ratio=args.train_ratio,
-        dataset_params=dataset_params,
     )
-    assert isinstance(dataloader_dict, dict)
+    params = get_parameter_depend_in_data_set(
+        args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device)
+    )
 
     # モデルの作成
     model = create_model(
         args.model,
-        num_classes=model_params["num_classes"],
+        num_classes=len(params["classes"]),
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,
         attention_branch=args.add_attention_branch,
         division_layer=args.div,
-        multi_task=model_params["is_multi_task"],
-        num_tasks=model_params["num_tasks"],
         theta_attention=args.theta_att,
     )
     assert model is not None, "Model name is invalid"
@@ -249,7 +247,7 @@ def main(args: argparse.Namespace):
         args.trainable_bottleneck,
         not "fe" in args.freeze,
         not "ab" in args.freeze,
-        not "perception" in args.freeze,
+        not "pb" in args.freeze,
         not "linear" in args.freeze,
     )
 
@@ -390,7 +388,7 @@ def parse_args():
         "--freeze",
         type=str,
         nargs="*",
-        choices=["fe", "ab", "perception", "linear"],
+        choices=["fe", "ab", "pb", "linear"],
         default=[],
         help="freezing layer",
     )
