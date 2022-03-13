@@ -2,15 +2,13 @@ from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import torch.utils.data as data
 import torchvision.transforms as transforms
-from metrics.accuracy import Accuracy, MultiLabelAccuracy
+from metrics.accuracy import Accuracy
 from metrics.base import Metric
 from torch import nn
 
 from data.IDRID import IDRiDDataset
-from data.IDRIDContrastive import IDRiDContrastiveDataset
-from data.voc_classification import VOCClassification
 
-ALL_DATASETS = ["VOC", "IDRiD", "IDRiDContrastive"]
+ALL_DATASETS = ["IDRiD"]
 
 
 def setting_dataset(
@@ -61,14 +59,7 @@ def setting_dataset(
     ## データセットに依存するモデル作成用パラメータを設定
     model_params = {"is_multi_task": False, "num_tasks": None}
 
-    if dataset_name == "VOC":
-        metrics = MultiLabelAccuracy()
-        criterion = nn.BCEWithLogitsLoss()
-        val_dataset = create_dataset(dataset_name, "val", image_size)
-        model_params["num_classes"] = 20
-        model_params["is_multi_task"] = True
-        model_params["num_tasks"] = [11, 1, 2, 1, 5]
-    elif dataset_name in ["IDRiD", "IDRiDContrastive"]:
+    if dataset_name == "IDRiD":
         metrics = Accuracy()
         assert dataset_params is not None
         # criterion = nn.CrossEntropyLoss(weight=dataset_params["loss_weights"])
@@ -162,24 +153,9 @@ def create_dataset(
                 ]
             )
 
-    if dataset_name == "VOC":
-        dataset = VOCClassification(
-            root="./datasets",
-            year="2007",
-            image_set=image_set,
-            download=True,
-            transform=transform,
-        )
-    elif dataset_name == "IDRiD":
+    if dataset_name == "IDRiD":
         dataset = IDRiDDataset(
             root="./datasets", image_set=image_set, transform=transform
-        )
-    elif dataset_name == "IDRiDContrastive":
-        dataset = IDRiDContrastiveDataset(
-            root="./datasets",
-            image_set=image_set,
-            theta_attention=theta_attetion,
-            transform=transform,
         )
     else:
         raise ValueError()
@@ -201,32 +177,7 @@ def get_dataset_params(dataset_name: str) -> Dict[str, Any]:
     # ImageNet
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
-    if dataset_name == "VOC":
-        params["mean"] = (0.4472, 0.4231, 0.3912)
-        params["std"] = (0.2406, 0.2345, 0.2372)
-        params["classes"] = (
-            "aeroplane",
-            "bicycle",
-            "bird",
-            "boat",
-            "bottle",
-            "bus",
-            "car",
-            "cat",
-            "chair",
-            "cow",
-            "diningtable",
-            "dog",
-            "horse",
-            "motorbike",
-            "person",
-            "pottedplant",
-            "sheep",
-            "sofa",
-            "train",
-            "tvmonitor",
-        )
-    elif dataset_name in ["IDRiD", "IDRiDContrastive"]:
+    if dataset_name == "IDRiD":
         params["mean"] = (0.4329, 0.2094, 0.0687)
         params["std"] = (0.3083, 0.1643, 0.0829)
         params["classes"] = ("normal", "abnormal")
