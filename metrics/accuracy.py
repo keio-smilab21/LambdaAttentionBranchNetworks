@@ -21,10 +21,11 @@ def num_correct_topk(
     """
     maxk = max(topk)
 
-    # [1, 2, 3, 4, 5].topk(3) -> (values=[5, 4, 3] indices=[4, 3, 2])
+    # 上位maxk個の予測クラスを取得
     _, pred = output.topk(maxk, dim=1)
     pred = pred.t()
-    # topk: [4, 3, 2] target(expand) : [3, 3, 3] -> [F. T. F]
+    # pred = [1, 2, 3] を label(expand) [3, 3, 3]と比較 (ラベルをmaxk個並べた配列)
+    # 上記の例では correct = [False, False, True] でmaxk番目までにTrueがあるかどうかがわかる
     correct = pred.eq(target.view(1, -1).expand_as(pred))
 
     # [[False, False, True], [F, F, F], [T, F, F]]
