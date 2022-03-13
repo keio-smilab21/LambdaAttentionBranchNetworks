@@ -10,16 +10,15 @@ from torchinfo import summary
 from tqdm import tqdm
 import wandb
 
-from data import ALL_DATASETS, get_parameter_depend_in_data_set, setting_dataset
+from data import ALL_DATASETS, get_parameter_depend_in_data_set, create_dataloader_dict
 from metrics.base import Metric
-from metrics.insdel import InsertionDeletion
-from metrics.block_insdel import BlockInsertionDeletion
+from metrics.patch_insdel import PatchInsertionDeletion
 from models import ALL_MODELS, create_model
 from models.attention_branch import AttentionBranchModel
 from models.lambda_resnet import Bottleneck
 from models.rise import RISE
 from utils.utils import fix_seed, module_generator, parse_with_config
-from utils.visualize import save_image, save_image_with_attention_map
+from utils.visualize import save_image_with_attention_map
 
 
 def calculate_attention(
@@ -30,13 +29,10 @@ def calculate_attention(
     rise_params: Optional[Dict[str, Any]],
     fname: Optional[str],
 ) -> Tuple[np.ndarray, bool]:
-    correct = True
     if method == "ABN":
         assert isinstance(model, AttentionBranchModel)
         y = model(image)
         # print(torch.argmax(y[0]), label)
-        if torch.argmax(y[0]).item() != label.item():
-            correct = False
         attentions = model.attention_branch.attention  # (1, W, W)
         attention = attentions[0]
         attention: np.ndarray = attention.cpu().numpy()
@@ -55,6 +51,7 @@ def calculate_attention(
         attention = attentions[label]
         attention: np.ndarray = attention.cpu().numpy()
     elif method == "npy":
+        assert fname is not None
         attention: np.ndarray = np.load(fname)
     elif method == "lambda":
         _ = model(image)
@@ -73,33 +70,33 @@ def calculate_attention(
     else:
         raise ValueError
 
-    return attention, correct
+    return attention
 
 
 @torch.no_grad()
 def visualize(
     dataloader: data.DataLoader,
-    att_model: nn.Module,
-    base_model: nn.Module,
+    model: nn.Module,
     method: str,
     batch_size: int,
+    patch_size: int,
+    step: int,
     save_dir: str,
-    device: torch.device,
     params: Dict[str, Any],
-    rise_params: Dict[str, Any],
+    device: torch.device,
     evaluate: bool = False,
-    block_size: int = 32,
     attention_dir: Optional[str] = None,
 ) -> Union[None, Metric]:
     if evaluate:
-        metrics = BlockInsertionDeletion()
+        metrics = PatchInsertionDeletion(
+            model, batch_size, patch_size, step, params["name"], device
+        )
         insdel_save_dir = os.path.join(save_dir, "insdel")
         if not os.path.isdir(insdel_save_dir):
             os.makedirs(insdel_save_dir)
 
-    att_model.eval()
+    model.eval()
     for i, data in enumerate(tqdm(dataloader, desc=f"Visualizing: ")):
-
         inputs, labels = data[0].to(device), data[1].to(device)
         image = inputs[0].cpu().numpy()
         label = labels[0]
@@ -110,29 +107,25 @@ def visualize(
         if attention_dir is not None:
             attention_fname = os.path.join(attention_dir, f"{base_fname}.npy")
 
-        attention, correct = calculate_attention(
-            att_model, inputs, label, method, rise_params, attention_fname
+        attention = calculate_attention(
+            model, inputs, label, method, params, attention_fname
         )
         if attention is None:
             continue
-        # np.save(f"{save_dir}/{base_fname}.npy", attention)
+        if method == 'RISE':
+            np.save(f"{save_dir}/{base_fname}.npy", attention)
 
         if evaluate:
             metrics.evaluate(
-                base_model,
                 image.copy(),
                 attention,
                 label,
-                batch_size,
-                args.insdel_step,
-                device,
-                block_size=block_size,
             )
             metrics.save_roc_curve(insdel_save_dir)
             base_fname = f"{base_fname}_{metrics.ins_auc - metrics.del_auc:.4f}"
 
         save_fname = os.path.join(
-            save_dir, f"{base_fname}_{['x', 'o'][metrics.correct]}.png"
+            save_dir, f"{base_fname}}.png"
         )
         save_image_with_attention_map(
             image, attention, save_fname, params["mean"], params["std"]
@@ -142,15 +135,16 @@ def visualize(
         return metrics
 
 
-def main() -> None:
+def main(args: argparse.Namespace) -> None:
     fix_seed(args.seed, args.no_deterministic)
 
     # データセットの作成
-    dataset_params = {"loss_weights": torch.Tensor(args.loss_weights).to(device)}
-    dataloader, model_params, _, _ = setting_dataset(
-        args.dataset, 1, args.image_size, is_test=True, dataset_params=dataset_params
+    dataloader_dict = create_dataloader_dict(
+        args.dataset, 1, args.image_size, only_test=True
     )
+    dataloader = dataloader_dict["Test"]
     assert isinstance(dataloader, data.DataLoader)
+
     params = get_parameter_depend_in_data_set(args.dataset)
 
     mask_path = os.path.join(args.root_dir, "masks.npy")
@@ -164,60 +158,41 @@ def main() -> None:
         "n_batch": args.batch_size,
         "mask_path": mask_path,
     }
+    params.update(rise_params)
 
     # モデルの作成
-    attention_model = create_model(
+    model = create_model(
         args.model,
-        num_classes=model_params["num_classes"],
+        num_classes=len(params["classes"]),
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,
         attention_branch=args.add_attention_branch,
         division_layer=args.div,
-        multi_task=model_params["is_multi_task"],
-        num_tasks=model_params["num_tasks"],
         theta_attention=args.theta_att,
     )
-    assert attention_model is not None, "Model name is invalid"
-
-    if args.orig_model:
-        eval_model = "orig"
-        base_model = create_model(
-            args.model,
-            num_classes=model_params["num_classes"],
-            pretrained_path="checkpoints/idrid_lambda-base.pt",
-            attention_branch=False,
-            division_layer=args.div,
-            multi_task=model_params["is_multi_task"],
-            num_tasks=model_params["num_tasks"],
-        )
-        assert base_model is not None
-    else:
-        eval_model = "same"
-        base_model = attention_model
+    assert model is not None, "Model name is invalid"
 
     # run_nameをpretrained pathから取得
     # checkpoints/run_name/checkpoint.pt -> run_name
     run_name = args.pretrained.split(os.sep)[-2]
     save_dir = os.path.join(
         "outputs",
-        f"{args.method}{args.block_size}_eval{eval_model}_{run_name}",
+        f"{run_name}_{args.method}{args.block_size}",
     )
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 
-    summary(attention_model, (args.batch_size, 3, args.image_size, args.image_size))
+    summary(model, (args.batch_size, 3, args.image_size, args.image_size))
 
-    attention_model.to(device)
-    base_model.to(device)
+    model.to(device)
 
     wandb.init(project=args.dataset, name=run_name)
     wandb.config.update(vars(args))
 
     metrics = visualize(
         dataloader,
-        attention_model,
-        base_model,
+        model,
         args.method,
         args.batch_size,
         save_dir,
@@ -236,9 +211,7 @@ def main() -> None:
         wandb.run.summary["deletion"] = metrics.deletion()
 
 
-if __name__ == "__main__":
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-c", "--config", type=str, help="path to config file (json)")
@@ -306,6 +279,10 @@ if __name__ == "__main__":
 
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
 
-    args = parse_with_config(parser)
+    return parse_with_config(parser)
 
-    main()
+
+if __name__ == "__main__":
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    main(parse_args())
