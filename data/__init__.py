@@ -1,9 +1,8 @@
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Optional
 
 import torch.utils.data as data
 import torchvision.transforms as transforms
 from metrics.accuracy import Accuracy
-from metrics.base import Metric
 from torch import nn
 
 from data.IDRID import IDRiDDataset
@@ -15,14 +14,9 @@ def setting_dataset(
     dataset_name: str,
     batch_size: int,
     image_size: int = 224,
-    is_test: bool = False,
+    only_test: bool = False,
     train_ratio: float = 0.9,
-    dataset_params: Optional[Dict[str, Any]] = None,
-) -> Tuple[
-    Union[data.DataLoader, Dict[str, data.DataLoader]],
-    Metric,
-    nn.modules.loss._Loss,
-]:
+) -> Dict[str, data.DataLoader]:
     """
     データセット名からデータローダー・評価指標・ロスの作成
 
@@ -30,28 +24,38 @@ def setting_dataset(
         dataset_name(str) : データセット名
         batch_size  (int) : バッチサイズ
         image_size  (int) : 画像サイズ
-        is_test     (bool): テストデータセットのみ作成
+        only_test   (bool): テストデータセットのみ作成
         train_ratio(float): valがないとき，train / valの分割割合
 
     Returns:
-        dataloader  : データローダーのdictまたはテストデータローダー
-        (Union[data.Dataloader, dict[str, data.Dataloader]])
-        metrics     : 評価指標
-        criterion   : ロス関数
+        dataloader_dict : データローダーのdict
     """
+
+    test_dataset = create_dataset(dataset_name, "test", image_size)
+    test_dataloader = data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False
+    )
+
+    if only_test:
+        return {"Test": test_dataloader}
+
     train_dataset = create_dataset(
         dataset_name,
         "train",
         image_size,
     )
-    test_dataset = create_dataset(dataset_name, "test", image_size)
 
-    if dataset_name == "IDRiD":
-        metrics = Accuracy()
-        assert dataset_params is not None
-        # criterion = nn.CrossEntropyLoss(weight=dataset_params["loss_weights"])
-        criterion = nn.BCEWithLogitsLoss(pos_weight=dataset_params["loss_weights"])
-        # lenが定義されてるとは限らないがIDRiDでは定義済みのため無視
+    dataset_params = get_parameter_depend_in_data_set(dataset_name)
+
+    # valの作成 or 分割
+    if dataset_params["has_val"]:
+        val_dataset = create_dataset(
+            dataset_name,
+            "val",
+            image_size,
+        )
+    else:
+        # lenが()定義されてるとは限らない
         # No `def __len__(self)` default? (data.Datasetより引用)
         # See NOTE [ Lack of Default `__len__` in Python Abstract Base Classes ]
         train_size = int(train_ratio * len(train_dataset))
@@ -61,15 +65,6 @@ def setting_dataset(
             train_dataset, [train_size, val_size]
         )
         val_dataset.transform = test_dataset.transform
-    else:
-        raise ValueError()
-
-    test_dataloader = data.DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False
-    )
-
-    if is_test:
-        return test_dataloader, metrics, criterion
 
     train_dataloader = data.DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True
@@ -82,7 +77,7 @@ def setting_dataset(
         "Test": test_dataloader,
     }
 
-    return dataloader_dict, metrics, criterion
+    return dataloader_dict
 
 
 def create_dataset(
@@ -135,17 +130,16 @@ def create_dataset(
                 ]
             )
 
-    if dataset_name == "IDRiD":
-        dataset = IDRiDDataset(
-            root="./datasets", image_set=image_set, transform=transform
-        )
-    else:
-        raise ValueError()
+    dataset = params["dataset"](
+        root="./datasets", image_set=image_set, transform=transform, params=params
+    )
 
     return dataset
 
 
-def get_parameter_depend_in_data_set(dataset_name: str) -> Dict[str, Any]:
+def get_parameter_depend_in_data_set(
+    dataset_name: str, pos_weight: float = 1, dataset_root: str = "./datasets"
+) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
 
@@ -162,9 +156,16 @@ def get_parameter_depend_in_data_set(dataset_name: str) -> Dict[str, Any]:
     # ImageNet
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
+    params["root"] = dataset_root
+
     if dataset_name == "IDRiD":
+        params["dataset"] = IDRiDDataset
         params["mean"] = (0.4329, 0.2094, 0.0687)
         params["std"] = (0.3083, 0.1643, 0.0829)
         params["classes"] = ("normal", "abnormal")
+        params["has_val"] = False
+
+        params["metric"] = Accuracy()
+        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     return params
