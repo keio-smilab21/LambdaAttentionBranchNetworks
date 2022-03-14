@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from data import get_parameter_depend_in_data_set
 from utils.utils import reverse_normalize
-from utils.visualize import save_data_as_plot
+from utils.visualize import save_data_as_plot, save_image
 
 from metrics.base import Metric
 import skimage.measure
@@ -144,6 +144,11 @@ class PatchInsertionDeletion(Metric):
             result = torch.cat([result, outputs.cpu().detach()], dim=0)
 
         return np.nan_to_num(result)
+
+    def save_images(self):
+        params = get_parameter_depend_in_data_set(self.dataset)
+        for i, image in enumerate(self.input):
+            save_image(image, f"tmp/{self.total}_{i}", params["mean"], params["std"])
 
     def score(self) -> Dict[str, float]:
         result = {
