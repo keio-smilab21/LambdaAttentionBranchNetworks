@@ -28,9 +28,9 @@ class PatchInsertionDeletion(Metric):
         self.total = 0
         self.total_insertion = 0
         self.total_deletion = 0
-        self.class_insertion = {}
-        self.num_by_classes = {}
-        self.class_deletion = {}
+        self.class_insertion: Dict[int, float] = {}
+        self.num_by_classes: Dict[int, int] = {}
+        self.class_deletion: Dict[int, float] = {}
 
         self.model = model
         self.batch_size = batch_size
