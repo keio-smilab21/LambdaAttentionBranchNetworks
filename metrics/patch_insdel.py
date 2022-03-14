@@ -184,6 +184,18 @@ class PatchInsertionDeletion(Metric):
     def deletion(self) -> float:
         return self.total_deletion / self.total
 
+    def class_insertion_score(self, class_idx: int) -> float:
+        num_samples = self.num_by_classes[class_idx]
+        inserton_score = self.class_insertion[class_idx]
+
+        return inserton_score / num_samples
+
+    def class_deletion_score(self, class_idx: int) -> float:
+        num_samples = self.num_by_classes[class_idx]
+        deletion_score = self.class_deletion[class_idx]
+
+        return deletion_score / num_samples
+
     def clear(self) -> None:
         self.total = 0
         self.ins_preds = None
