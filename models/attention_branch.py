@@ -250,8 +250,6 @@ def add_attention_branch(
         base_model(nn.Module): ベースとするモデル
         division_index(int)  : モデルの分割一
         num_classes(int)     : クラス数
-        multi_task(bool)     : マルチタスク化するか
-        num_tasks(List[int]) : 各タスクのクラス数(create_modelのNote参照)
 
     Returns:
         nn.Module: AttentionBranch化したモデル
