@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from data import get_parameter_depend_in_data_set
 from utils.utils import reverse_normalize
-from utils.visualize import save_data_as_plot
+from utils.visualize import save_data_as_plot, save_image
 
 from metrics.base import Metric
 import skimage.measure
@@ -28,9 +28,9 @@ class PatchInsertionDeletion(Metric):
         self.total = 0
         self.total_insertion = 0
         self.total_deletion = 0
-        self.class_insertion = {}
-        self.num_by_classes = {}
-        self.class_deletion = {}
+        self.class_insertion: Dict[int, float] = {}
+        self.num_by_classes: Dict[int, int] = {}
+        self.class_deletion: Dict[int, float] = {}
 
         self.model = model
         self.batch_size = batch_size
@@ -110,7 +110,8 @@ class PatchInsertionDeletion(Metric):
         image = reverse_normalize(self.image.copy(), params["mean"], params["std"])
 
         for i in range(num_insertion):
-            step_index = self.step * (i + 1)
+            # self.order.shape[1] = (2, N)
+            step_index = min(self.step * (i + 1), self.order.shape[1] - 1)
             w_indices = self.order[0, step_index]
             h_indices = self.order[1, step_index]
             threthold = self.patch_attention[w_indices, h_indices]
@@ -134,9 +135,9 @@ class PatchInsertionDeletion(Metric):
 
         for iter in range(num_iter):
             start = self.batch_size * iter
-            inputs = inputs[start : start + self.batch_size].to(self.device)
+            batch_inputs = inputs[start : start + self.batch_size].to(self.device)
 
-            outputs = self.model(inputs)
+            outputs = self.model(batch_inputs)
 
             outputs = F.softmax(outputs, 1)
             outputs = outputs[:, self.label]
@@ -144,39 +145,61 @@ class PatchInsertionDeletion(Metric):
 
         return np.nan_to_num(result)
 
+    def save_images(self):
+        params = get_parameter_depend_in_data_set(self.dataset)
+        for i, image in enumerate(self.input):
+            save_image(image, f"tmp/{self.total}_{i}", params["mean"], params["std"])
+
     def score(self) -> Dict[str, float]:
-        return {
+        result = {
             "Insertion": self.insertion(),
             "Deletion": self.deletion(),
             "PID": self.insertion() - self.deletion(),
         }
 
+        for class_idx in self.class_insertion.keys():
+            class_ins = self.class_insertion_score(class_idx)
+            class_del = self.class_deletion_score(class_idx)
+            class_result = {
+                f"Insertion_{class_idx}": class_ins,
+                f"Deletion_{class_idx}": class_del,
+                f"PID_{class_idx}": class_ins - class_del,
+            }
+            result.update(class_result)
+
+        return result
+
     def log(self) -> str:
-        result = ""
+        result = "Class\tPID\tIns\tDel\n"
+
         scores = self.score()
-        for name, score in scores.items():
-            result += f"{name}: {score:.3f} "
+        result += f"All\t{scores['PID']:.3f}\t{scores['Insertion']:.3f}\t{scores['Deletion']:.3f}\n"
 
-        result += "\n Insertion\t"
-        for class_id, insertion_score in self.class_insertion.items():
-            class_total = self.num_by_classes[class_id]
-            insertion_score /= class_total
-            result += f"{class_id} ({class_total}): {insertion_score:.3f} "
+        for class_idx in self.class_insertion.keys():
+            pid = scores[f"PID_{class_idx}"]
+            insertion = scores[f"Insertion_{class_idx}"]
+            deletion = scores[f"Deletion_{class_idx}"]
+            result += f"{class_idx}\t{pid:.3f}\t{insertion:.3f}\t{deletion:.3f}\n"
 
-        result += "\n Deletion\t"
-        for class_id, deletion_score in self.class_deletion.items():
-            class_total = self.num_by_classes[class_id]
-            deletion_score /= class_total
-            result += f"{class_id} ({class_total}): {deletion_score:.3f} "
-
-        # 最後の空白を削る
-        return result[:-1]
+        return result
 
     def insertion(self) -> float:
         return self.total_insertion / self.total
 
     def deletion(self) -> float:
         return self.total_deletion / self.total
+
+    def class_insertion_score(self, class_idx: int) -> float:
+        num_samples = self.num_by_classes[class_idx]
+        inserton_score = self.class_insertion[class_idx]
+
+        return inserton_score / num_samples
+
+    def class_deletion_score(self, class_idx: int) -> float:
+        num_samples = self.num_by_classes[class_idx]
+        deletion_score = self.class_deletion[class_idx]
+
+        return deletion_score / num_samples
 
     def clear(self) -> None:
         self.total = 0
@@ -189,18 +212,6 @@ class PatchInsertionDeletion(Metric):
 
         del_fname = os.path.join(save_dir, f"{self.total}_deletion.png")
         save_data_as_plot(self.del_preds, del_fname, label=f"AUC = {self.del_auc:.4f}")
-
-    def log_gspread(self):
-        num_normal = self.num_by_classes[0]
-        num_abnormal = self.num_by_classes[1]
-
-        ins_normal = self.class_insertion[0] / num_normal
-        ins_abnormal = self.class_insertion[1] / num_abnormal
-
-        del_normal = self.class_deletion[0] / num_normal
-        del_abnormal = self.class_deletion[1] / num_abnormal
-
-        return f"{ins_normal}\t{ins_abnormal}\t{self.insertion()}\t{del_normal}\t{del_abnormal}\t{self.deletion()}"
 
 
 def map_2d_indices(indices_1d: int, width: int):

@@ -111,7 +111,7 @@ def visualize(
         )
         if attention is None:
             continue
-        if method == 'RISE':
+        if method == "RISE":
             np.save(f"{save_dir}/{base_fname}.npy", attention)
 
         if evaluate:
@@ -123,9 +123,7 @@ def visualize(
             metrics.save_roc_curve(insdel_save_dir)
             base_fname = f"{base_fname}_{metrics.ins_auc - metrics.del_auc:.4f}"
 
-        save_fname = os.path.join(
-            save_dir, f"{base_fname}}.png"
-        )
+        save_fname = os.path.join(save_dir, f"{base_fname}.png")
         save_image_with_attention_map(
             image, attention, save_fname, params["mean"], params["std"]
         )
@@ -194,20 +192,19 @@ def main(args: argparse.Namespace) -> None:
         model,
         args.method,
         args.batch_size,
+        args.block_size,
+        args.insdel_step,
         save_dir,
-        device,
         params,
-        rise_params,
+        device,
         args.visualize_only,
-        block_size=args.block_size,
         attention_dir=args.attention_dir,
     )
 
     if metrics is not None:
         print(metrics.log())
-        print(metrics.log_gspread())
-        wandb.run.summary["insertion"] = metrics.insertion()
-        wandb.run.summary["deletion"] = metrics.deletion()
+        for key, value in metrics.score().items():
+            wandb.run.summary[key] = value
 
 
 def parse_args() -> argparse.Namespace:
