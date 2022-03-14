@@ -70,9 +70,15 @@ def create_dataloader_dict(
         )
     val_dataset.transform = test_dataset.transform
 
-    train_dataloader = data.DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True
-    )
+    if dataset_params["sampler"]:
+        train_dataloader = data.DataLoader(
+            train_dataset,
+            batch_sampler=BalancedBatchSampler(train_dataset, 2, batch_size // 2),
+        )
+    else:
+        train_dataloader = data.DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True
+        )
     val_dataloader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     dataloader_dict = {
@@ -171,6 +177,7 @@ def get_parameter_depend_in_data_set(
     params["root"] = dataset_root
     params["has_params"] = False
     params["num_channel"] = 3
+    params["sampler"] = False
     # ImageNet
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
@@ -192,6 +199,7 @@ def get_parameter_depend_in_data_set(
         params["classes"] = ("OC", "MX")
         params["has_val"] = True
         params["has_params"] = True
+        params["sampler"] = True
         params["years"] = {
             "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
             "val": ["2016"],
