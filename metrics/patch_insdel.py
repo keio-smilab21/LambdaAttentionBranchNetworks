@@ -110,7 +110,8 @@ class PatchInsertionDeletion(Metric):
         image = reverse_normalize(self.image.copy(), params["mean"], params["std"])
 
         for i in range(num_insertion):
-            step_index = self.step * (i + 1)
+            # self.order.shape[1] = (2, N)
+            step_index = min(self.step * (i + 1), self.order.shape[1] - 1)
             w_indices = self.order[0, step_index]
             h_indices = self.order[1, step_index]
             threthold = self.patch_attention[w_indices, h_indices]
