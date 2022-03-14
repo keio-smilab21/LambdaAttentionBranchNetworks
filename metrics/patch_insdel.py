@@ -146,32 +146,37 @@ class PatchInsertionDeletion(Metric):
         return np.nan_to_num(result)
 
     def score(self) -> Dict[str, float]:
-        return {
+        result = {
             "Insertion": self.insertion(),
             "Deletion": self.deletion(),
             "PID": self.insertion() - self.deletion(),
         }
 
+        for class_idx in self.class_insertion.keys():
+            class_ins = self.class_insertion_score(class_idx)
+            class_del = self.class_deletion_score(class_idx)
+            class_result = {
+                f"Insertion_{class_idx}": class_ins,
+                f"Deletion_{class_idx}": class_del,
+                f"PID_{class_idx}": class_ins - class_del,
+            }
+            result.update(class_result)
+
+        return result
+
     def log(self) -> str:
-        result = ""
+        result = "Class\tPID\tIns\tDel\n"
+
         scores = self.score()
-        for name, score in scores.items():
-            result += f"{name}: {score:.3f} "
+        result += f"All\t{scores['PID']:.3f}\t{scores['Insertion']:.3f}\t{scores['Deletion']:.3f}\n"
 
-        result += "\n Insertion\t"
-        for class_id, insertion_score in self.class_insertion.items():
-            class_total = self.num_by_classes[class_id]
-            insertion_score /= class_total
-            result += f"{class_id} ({class_total}): {insertion_score:.3f} "
+        for class_idx in self.class_insertion.keys():
+            pid = scores[f"PID_{class_idx}"]
+            insertion = scores[f"Insertion_{class_idx}"]
+            deletion = scores[f"Deletion_{class_idx}"]
+            result += f"{class_idx}\t{pid:.3f}\t{insertion:.3f}\t{deletion:.3f}\n"
 
-        result += "\n Deletion\t"
-        for class_id, deletion_score in self.class_deletion.items():
-            class_total = self.num_by_classes[class_id]
-            deletion_score /= class_total
-            result += f"{class_id} ({class_total}): {deletion_score:.3f} "
-
-        # 最後の空白を削る
-        return result[:-1]
+        return result
 
     def insertion(self) -> float:
         return self.total_insertion / self.total
