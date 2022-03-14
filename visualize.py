@@ -123,9 +123,7 @@ def visualize(
             metrics.save_roc_curve(insdel_save_dir)
             base_fname = f"{base_fname}_{metrics.ins_auc - metrics.del_auc:.4f}"
 
-        save_fname = os.path.join(
-            save_dir, f"{base_fname}}.png"
-        )
+        save_fname = os.path.join(save_dir, f"{base_fname}.png")
         save_image_with_attention_map(
             image, attention, save_fname, params["mean"], params["std"]
         )
