@@ -111,7 +111,7 @@ def visualize(
         )
         if attention is None:
             continue
-        if method == 'RISE':
+        if method == "RISE":
             np.save(f"{save_dir}/{base_fname}.npy", attention)
 
         if evaluate:
