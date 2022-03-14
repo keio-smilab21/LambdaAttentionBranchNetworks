@@ -135,9 +135,9 @@ class PatchInsertionDeletion(Metric):
 
         for iter in range(num_iter):
             start = self.batch_size * iter
-            inputs = inputs[start : start + self.batch_size].to(self.device)
+            batch_inputs = inputs[start : start + self.batch_size].to(self.device)
 
-            outputs = self.model(inputs)
+            outputs = self.model(batch_inputs)
 
             outputs = F.softmax(outputs, 1)
             outputs = outputs[:, self.label]
