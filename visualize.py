@@ -192,12 +192,12 @@ def main(args: argparse.Namespace) -> None:
         model,
         args.method,
         args.batch_size,
+        args.block_size,
+        args.insdel_step,
         save_dir,
-        device,
         params,
-        rise_params,
+        device,
         args.visualize_only,
-        block_size=args.block_size,
         attention_dir=args.attention_dir,
     )
 
