@@ -190,18 +190,6 @@ class PatchInsertionDeletion(Metric):
         del_fname = os.path.join(save_dir, f"{self.total}_deletion.png")
         save_data_as_plot(self.del_preds, del_fname, label=f"AUC = {self.del_auc:.4f}")
 
-    def log_gspread(self):
-        num_normal = self.num_by_classes[0]
-        num_abnormal = self.num_by_classes[1]
-
-        ins_normal = self.class_insertion[0] / num_normal
-        ins_abnormal = self.class_insertion[1] / num_abnormal
-
-        del_normal = self.class_deletion[0] / num_normal
-        del_abnormal = self.class_deletion[1] / num_abnormal
-
-        return f"{ins_normal}\t{ins_abnormal}\t{self.insertion()}\t{del_normal}\t{del_abnormal}\t{self.deletion()}"
-
 
 def map_2d_indices(indices_1d: int, width: int):
     """

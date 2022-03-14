@@ -205,9 +205,8 @@ def main(args: argparse.Namespace) -> None:
 
     if metrics is not None:
         print(metrics.log())
-        print(metrics.log_gspread())
-        wandb.run.summary["insertion"] = metrics.insertion()
-        wandb.run.summary["deletion"] = metrics.deletion()
+        for key, value in metrics.score().items():
+            wandb.run.summary[key] = value
 
 
 def parse_args() -> argparse.Namespace:
