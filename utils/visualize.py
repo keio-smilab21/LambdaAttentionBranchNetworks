@@ -16,9 +16,10 @@ def save_attention_map(attention: Union[np.ndarray, torch.Tensor], fname: str) -
     min_att = attention.min()
     max_att = attention.max()
 
-    ax.imshow(
+    im = ax.imshow(
         attention, interpolation="nearest", cmap="jet", vmin=min_att, vmax=max_att
     )
+    fig.colorbar(im)
     plt.savefig(fname)
     plt.clf()
     plt.close()
