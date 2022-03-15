@@ -70,7 +70,7 @@ def module_generator(model: nn.Module, reverse: bool = False):
         modules = modules[::-1]
 
     for module in modules:
-        if isinstance(module, nn.Sequential):
+        if list(module.children()):
             yield from module_generator(module, reverse)
             continue
         yield module
