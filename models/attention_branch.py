@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from utils.utils import module_generator
+
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     """3x3 convolution with padding"""
@@ -261,8 +263,8 @@ def add_attention_branch(
 
     # pre_modelの最終層のチャンネル数を合わせる
     # children()はSequential入れ子に入れないのでもう一度children()
-    final_layer = list(modules[division_index][-1].children())
-    for module in final_layer[::-1]:
+    final_layer = module_generator(modules[division_index], reverse=True)
+    for module in final_layer:
         if isinstance(module, nn.modules.batchnorm._NormBase):
             # TODO なんで2？多分この後に1/2してるけどSequentialで取れてない
             inplanes = module.num_features // 2
