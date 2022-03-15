@@ -7,8 +7,9 @@ from torchvision.models.resnet import resnet18, resnet50
 
 from models.attention_branch import add_attention_branch
 from models.lambda_resnet import lambda_resnet50
+from models.cnn import CNNModel
 
-ALL_MODELS = ["lambda_resnet", "resnet", "resnet50"]
+ALL_MODELS = ["lambda_resnet", "resnet", "resnet50", "CNN"]
 
 
 def change_num_classes(
@@ -96,6 +97,10 @@ def create_model(
         model = resnet50(pretrained=(base_pretrained is not None))
         layer_index = {"layer1": -6, "layer2": -5, "layer3": -4}
         add_flatten = True
+    elif base_model == "CNN":
+        model = CNNModel()
+        layer_index = {"layer1": 4, "layer2": 4}
+        add_flatten = False
     else:
         return None
 
