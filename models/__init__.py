@@ -56,6 +56,7 @@ def change_num_classes(
 def create_model(
     base_model: str,
     num_classes: int = 1000,
+    num_channel: int = 3,
     base_pretrained: Optional[str] = None,
     base_pretrained2: Optional[str] = None,
     pretrained_path: Optional[str] = None,

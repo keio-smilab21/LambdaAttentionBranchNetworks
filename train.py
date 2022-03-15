@@ -234,6 +234,7 @@ def main(args: argparse.Namespace):
     model = create_model(
         args.model,
         num_classes=len(data_params["classes"]),
+        num_channel=data_params["num_channel"],
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,

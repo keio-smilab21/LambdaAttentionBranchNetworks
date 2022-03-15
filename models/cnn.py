@@ -5,10 +5,12 @@ from models.lambda_resnet import conv1x1, Bottleneck
 
 
 class CNNModel(nn.Module):
-    def __init__(self):
+    def __init__(self, num_channel: int):
         super().__init__()
 
-        self.conv1 = nn.Conv2d(1, 16, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(
+            num_channel, 16, kernel_size=7, stride=2, padding=3, bias=False
+        )
         self.bn1 = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
