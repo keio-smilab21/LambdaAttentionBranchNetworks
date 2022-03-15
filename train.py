@@ -298,7 +298,10 @@ def main(args: argparse.Namespace):
     save_json(configs, os.path.join(save_dir, "config.json"))
 
     # モデルの詳細表示（torchsummary）
-    summary(model, (args.batch_size, 3, args.image_size, args.image_size))
+    summary(
+        model,
+        (args.batch_size, data_params["num_channel"], args.image_size, args.image_size),
+    )
 
     lambdas = {"att": args.lambda_att}
 
@@ -308,7 +311,6 @@ def main(args: argparse.Namespace):
         print(f"\n[Epoch {epoch+1}]")
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
-                dataloader.dataset.dataset.model = model
                 loss, metric = train(
                     dataloader,
                     model,

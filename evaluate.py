@@ -57,6 +57,7 @@ def main(args: argparse.Namespace) -> None:
     model = create_model(
         args.model,
         num_classes=len(params["classes"]),
+        num_channel=params["num_channel"],
         base_pretrained=args.base_pretrained,
         base_pretrained2=args.base_pretrained2,
         pretrained_path=args.pretrained,
@@ -79,7 +80,10 @@ def main(args: argparse.Namespace) -> None:
     if not os.path.isdir(save_dir):
         os.makedirs(save_dir)
 
-    summary(model, (args.batch_size, 3, args.image_size, args.image_size))
+    summary(
+        model,
+        (args.batch_size, params["num_channel"], args.image_size, args.image_size),
+    )
 
     model.to(device)
 

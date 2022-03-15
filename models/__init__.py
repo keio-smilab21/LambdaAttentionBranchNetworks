@@ -99,7 +99,7 @@ def create_model(
         layer_index = {"layer1": -6, "layer2": -5, "layer3": -4}
         add_flatten = True
     elif base_model == "CNN":
-        model = CNNModel()
+        model = CNNModel(num_channel=num_channel)
         layer_index = {"layer1": 4, "layer2": 4}
         add_flatten = False
     else:
