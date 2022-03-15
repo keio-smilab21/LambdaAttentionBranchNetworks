@@ -22,7 +22,7 @@
     ```
     $ python train.py -c [path to config json]
     ```
-    (pretrained models are [here](https://drive.google.com/drive/folders/1rFXBXlT7ieOg351glLjmy3BhT6Yfvffk?usp=sharing))
+    (pretrained models are [here](https://drive.google.com/drive/folders/1rFXBXlT7ieOg351glLjmy3BhT6Yfvffk?usp=sharing). Extract the files to "checkpoints")
 1. Run evaluate
     ```
     $ python evaluate.py -c [path to config json] --pretrained [path to pretrained]
