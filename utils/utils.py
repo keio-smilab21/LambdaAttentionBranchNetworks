@@ -85,26 +85,6 @@ def save_json(data: Union[List, Dict], save_path: str) -> None:
         json.dump(data, f, indent=4)
 
 
-def softmax_image(image: torch.Tensor) -> torch.Tensor:
-    image_size = image.size()
-    if len(image_size) == 4:
-        B, C, W, H = image_size
-    elif len(image_size) == 3:
-        B = 1
-        C, W, H = image_size
-    else:
-        raise ValueError
-
-    image = image.view(B, C, W * H)
-    image = torch.softmax(image, dim=-1)
-
-    image = image.view(B, C, W, H)
-    if len(image_size) == 3:
-        image = image[0]
-
-    return image
-
-
 def tensor_to_numpy(tensor: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
     if isinstance(tensor, torch.Tensor):
         result: np.ndarray = tensor.cpu().detach().numpy()
