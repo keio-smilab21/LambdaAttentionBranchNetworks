@@ -353,6 +353,8 @@ def main(args: argparse.Namespace):
             break
 
     torch.save(model.state_dict(), os.path.join(save_dir, f"best.pt"))
+    configs["val_loss"] = early_stopping.best_val_loss
+    save_json(configs, os.path.join(save_dir, "config.json"))
     print("Training Finished")
 
 
