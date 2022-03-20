@@ -81,6 +81,7 @@ def visualize(
     patch_size: int,
     step: int,
     save_dir: str,
+    all_class: bool,
     params: Dict[str, Any],
     device: torch.device,
     evaluate: bool = False,
@@ -99,6 +100,9 @@ def visualize(
         inputs, labels = data[0].to(device), data[1].to(device)
         image = inputs[0].cpu().numpy()
         label = labels[0]
+
+        if label != 1 and not all_class:
+            continue
 
         base_fname = f"{i+1}_{params['classes'][label]}"
 
@@ -199,6 +203,7 @@ def main(args: argparse.Namespace) -> None:
         args.block_size,
         args.insdel_step,
         save_dir,
+        args.all_class,
         params,
         device,
         args.visualize_only,
@@ -264,6 +269,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--root_dir", type=str, default="./outputs/")
     parser.add_argument("--visualize_only", action="store_false")
+    parser.add_argument("--all_classes", action="store_true")
     parser.add_argument("--insdel_step", type=int, default=500)
     parser.add_argument("--block_size", type=int, default=32)
 
