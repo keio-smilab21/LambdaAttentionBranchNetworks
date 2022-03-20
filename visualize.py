@@ -88,7 +88,7 @@ def visualize(
     attention_dir: Optional[str] = None,
 ) -> Union[None, Metric]:
     if evaluate:
-        metrics = PatchInsertionDeletion(
+        pid = PatchInsertionDeletion(
             model, batch_size, patch_size, step, params["name"], device
         )
         insdel_save_dir = os.path.join(save_dir, "insdel")
@@ -119,13 +119,13 @@ def visualize(
             np.save(f"{save_dir}/{base_fname}.npy", attention)
 
         if evaluate:
-            metrics.evaluate(
+            pid.evaluate(
                 image.copy(),
                 attention,
                 label,
             )
-            metrics.save_roc_curve(insdel_save_dir)
-            base_fname = f"{base_fname}_{metrics.ins_auc - metrics.del_auc:.4f}"
+            pid.save_roc_curve(insdel_save_dir)
+            base_fname = f"{base_fname}_{pid.ins_auc - pid.del_auc:.4f}"
 
         save_fname = os.path.join(save_dir, f"{base_fname}.png")
         save_image_with_attention_map(
@@ -133,7 +133,7 @@ def visualize(
         )
 
     if evaluate:
-        return metrics
+        return pid
 
 
 def main(args: argparse.Namespace) -> None:
