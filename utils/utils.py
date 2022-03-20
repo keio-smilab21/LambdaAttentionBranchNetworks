@@ -32,9 +32,9 @@ def fix_seed(seed: int, deterministic: bool = False) -> None:
 
 def reverse_normalize(
     x: np.ndarray,
-    mean: Union[Tuple[float], Tuple[float, float, float]],
-    std: Union[Tuple[float], Tuple[float, float, float]],
-):
+    mean: Tuple[float, ...],
+    std: Tuple[float, ...],
+) -> np.ndarray:
     """
     Normalizeを戻す
 
