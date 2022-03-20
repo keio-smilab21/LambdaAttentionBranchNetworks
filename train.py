@@ -286,7 +286,7 @@ def main(args: argparse.Namespace):
     best_path = os.path.join(save_dir, f"best.pt")
 
     configs = vars(args)
-    configs.pop("config")  # モデルと一緒に保存するargsを適用した新configに旧configの情報が入らないように
+    configs.pop("config")  # 新configに旧configの情報が入らないように
 
     early_stopping = EarlyStopping(
         patience=args.early_stopping_patience, save_dir=save_dir
