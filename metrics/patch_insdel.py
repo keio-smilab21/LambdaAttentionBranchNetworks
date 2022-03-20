@@ -101,13 +101,14 @@ class PatchInsertionDeletion(Metric):
         )
 
     def generate_insdel_images(self, mode: str):
-        W, H = self.attention.shape
+        C, W, H = self.image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
 
         params = get_parameter_depend_in_data_set(self.dataset)
-        self.input = np.zeros((num_insertion, 3, W, H))
-        image = reverse_normalize(self.image.copy(), params["mean"], params["std"])
+        self.input = np.zeros((num_insertion, C, W, H))
+        mean, std = params["mean"], params["std"]
+        image = reverse_normalize(self.image.copy(), mean, std)
 
         for i in range(num_insertion):
             # self.order.shape[1] = (2, N)
@@ -123,9 +124,8 @@ class PatchInsertionDeletion(Metric):
 
             mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-            self.input[i, 0] = (image[0] * mask - params["mean"][0]) / params["std"][0]
-            self.input[i, 1] = (image[1] * mask - params["mean"][1]) / params["std"][1]
-            self.input[i, 2] = (image[2] * mask - params["mean"][2]) / params["std"][2]
+            for c in range(C):
+                self.input[i, c] = (image[c] * mask - mean[c]) / std[c]
 
     def inference(self):
         inputs = torch.Tensor(self.input)

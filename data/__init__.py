@@ -194,8 +194,8 @@ def get_parameter_depend_in_data_set(
     elif dataset_name == "magnetogram":
         params["dataset"] = Magnetogram
         params["num_channel"] = 1
-        params["mean"] = 0.3625
-        params["std"] = 0.2234
+        params["mean"] = (0.3625,)
+        params["std"] = (0.2234,)
         params["classes"] = ("OC", "MX")
         params["has_val"] = True
         params["has_params"] = True
