@@ -269,7 +269,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--root_dir", type=str, default="./outputs/")
     parser.add_argument("--visualize_only", action="store_false")
-    parser.add_argument("--all_classes", action="store_true")
+    parser.add_argument("--all_class", action="store_true")
     parser.add_argument("--insdel_step", type=int, default=500)
     parser.add_argument("--block_size", type=int, default=32)
 
