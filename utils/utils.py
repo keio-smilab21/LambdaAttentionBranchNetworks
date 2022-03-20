@@ -43,14 +43,11 @@ def reverse_normalize(
         mean(Tuple): Normalize時に指定した平均
         std(Tuple) : Normalize時に指定した標準偏差
     """
-    if x.shape[0] == 1:
-        x = x * std + mean
-        return x
-    x[0, :, :] = x[0, :, :] * std[0] + mean[0]
-    x[1, :, :] = x[1, :, :] * std[1] + mean[1]
-    x[2, :, :] = x[2, :, :] * std[2] + mean[2]
+    result = x.copy()
+    for c, (mean_c, std_c) in enumerate(zip(mean, std)):
+        result[c, :, :] = x[c, :, :] * std_c + mean_c
 
-    return x
+    return result
 
 
 def module_generator(model: nn.Module, reverse: bool = False):
