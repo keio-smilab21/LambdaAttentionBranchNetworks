@@ -110,71 +110,6 @@ def create_dataloader_dict(
     return dataloader_dict
 
 
-def create_dataset(
-    dataset_name: str,
-    image_set: str = "train",
-    image_size: int = 224,
-    transform: Optional[Callable] = None,
-) -> data.Dataset:
-    """
-    データセットの作成
-    正規化パラメータなどはデータセットごとに作成
-
-    Args:
-        dataset_name(str)  : データセット名
-        image_set(str)     : train / val / testから選択
-        image_size(int)    : 画像サイズ
-        transform(Callable): transform
-
-    Returns:
-        data.Dataset : pytorchデータセット
-    """
-    assert dataset_name in ALL_DATASETS
-    params = get_parameter_depend_in_data_set(dataset_name)
-
-    if transform is None:
-        if image_set == "train":
-            transform = transforms.Compose(
-                [
-                    transforms.Resize((image_size, image_size)),
-                    transforms.RandomHorizontalFlip(0.5),
-                    transforms.RandomVerticalFlip(0.5),
-                    transforms.RandomRotation(degrees=5),
-                    transforms.RandomResizedCrop(
-                        (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
-                    ),
-                    transforms.ColorJitter(
-                        brightness=0.5, contrast=0.5, saturation=0.5, hue=0
-                    ),
-                    transforms.ToTensor(),
-                    transforms.Normalize(params["mean"], params["std"]),
-                    transforms.RandomErasing(),
-                ]
-            )
-        else:
-            transform = transforms.Compose(
-                [
-                    transforms.Resize((image_size, image_size)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(params["mean"], params["std"]),
-                ]
-            )
-
-    if params["has_params"]:
-        dataset = params["dataset"](
-            root="./datasets",
-            image_set=image_set,
-            params=params,
-            transform=transform,
-        )
-    else:
-        dataset = params["dataset"](
-            root="./datasets", image_set=image_set, transform=transform
-        )
-
-    return dataset
-
-
 def get_parameter_depend_in_data_set(
     dataset_name: str,
     pos_weight: torch.Tensor = torch.Tensor([1]),
@@ -230,3 +165,38 @@ def get_parameter_depend_in_data_set(
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     return params
+
+
+def create_transform(
+    image_set: str,
+    image_size: int,
+    params: Dict[str, Any],
+    p_random_erasing: float = 0.5,
+):
+    if image_set == "train":
+        return transforms.Compose(
+            [
+                transforms.Resize((image_size, image_size)),
+                transforms.RandomHorizontalFlip(0.5),
+                transforms.RandomVerticalFlip(0.5),
+                transforms.RandomRotation(degrees=5),
+                transforms.RandomResizedCrop(
+                    (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
+                ),
+                transforms.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.5, hue=0
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(params["mean"], params["std"]),
+                # transforms.RandomErasing(),
+            ]
+        )
+
+    return transforms.Compose(
+        [
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(params["mean"], params["std"]),
+        ]
+    )
+
