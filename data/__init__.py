@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, Optional
+import random
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 import torch.utils.data as data
@@ -63,32 +64,24 @@ def create_dataloader_dict(
     if only_test:
         return {"Test": test_dataloader}
 
-    train_dataset = create_dataset(
-        dataset_name,
-        "train",
-        image_size,
-    )
-
     dataset_params = get_parameter_depend_in_data_set(dataset_name)
 
     # valの作成 or 分割
     if dataset_params["has_val"]:
+        train_dataset = create_dataset(
+            dataset_name,
+            "train",
+            image_size,
+        )
         val_dataset = create_dataset(
             dataset_name,
             "val",
             image_size,
         )
     else:
-        # lenが()定義されてるとは限らない
-        # No `def __len__(self)` default? (data.Datasetより引用)
-        # See NOTE [ Lack of Default `__len__` in Python Abstract Base Classes ]
-        train_size = int(train_ratio * len(train_dataset))
-        val_size = len(train_dataset) - train_size
-
-        train_dataset, val_dataset = data.random_split(
-            train_dataset, [train_size, val_size]
+        train_dataset, val_dataset = create_train_val_dataset(
+            dataset_name, train_ratio, image_size
         )
-    val_dataset.transform = test_dataset.transform
 
     if dataset_params["sampler"]:
         train_dataloader = data.DataLoader(
@@ -200,3 +193,72 @@ def create_transform(
         ]
     )
 
+
+def create_train_val_dataset(
+    dataset_name: str,
+    train_ratio: float,
+    image_size: int = 224,
+):
+    params = get_parameter_depend_in_data_set(dataset_name)
+    train_transform = create_transform("train", image_size, params)
+    test_transform = create_transform("test", image_size, params)
+
+    trainval_dataset = params["dataset"](
+        root="./datasets",
+        image_set="train",
+        transform=None,
+    )
+
+    indices = range(len(trainval_dataset) - 1)
+    train_size = int(train_ratio * len(trainval_dataset)) + 1
+    val_size = len(trainval_dataset) - train_size
+
+    train_indices = random.sample(indices, train_size) + [len(trainval_dataset) - 1]
+    val_indices = random.sample(indices, val_size)
+
+    train_dataset = SubsetWithTransform(
+        trainval_dataset, train_indices, train_transform
+    )
+    val_dataset = SubsetWithTransform(trainval_dataset, val_indices, test_transform)
+
+    return train_dataset, val_dataset
+
+
+def create_dataset(
+    dataset_name: str,
+    image_set: str = "train",
+    image_size: int = 224,
+    transform: Optional[Callable] = None,
+) -> Dataset:
+    """
+    データセットの作成
+    正規化パラメータなどはデータセットごとに作成
+
+    Args:
+        dataset_name(str)  : データセット名
+        image_set(str)     : train / val / testから選択
+        image_size(int)    : 画像サイズ
+        transform(Callable): transform
+
+    Returns:
+        Dataset : pytorchデータセット
+    """
+    assert dataset_name in ALL_DATASETS
+    params = get_parameter_depend_in_data_set(dataset_name)
+
+    if transform is None:
+        transform = create_transform(image_set, image_size, params)
+
+    if params["has_params"]:
+        dataset = params["dataset"](
+            root="./datasets",
+            image_set=image_set,
+            params=params,
+            transform=transform,
+        )
+    else:
+        dataset = params["dataset"](
+            root="./datasets", image_set=image_set, transform=transform
+        )
+
+    return dataset
