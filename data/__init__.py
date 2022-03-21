@@ -6,12 +6,32 @@ import torchvision.transforms as transforms
 from metrics.accuracy import Accuracy
 from metrics.flare import FlareMetric
 from torch import nn
+from torch.utils.data import Dataset
 
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
+
+
+class SubsetWithTransform(Dataset):
+    def __init__(
+        self, dataset: Dataset, indices: List[int], transform: Optional[Callable] = None
+    ):
+        self.dataset = dataset
+        self.indices = indices
+        self.transform = transform
+
+    def __getitem__(self, idx):
+        img, label = self.dataset[self.indices[idx]]
+        if self.transform:
+            img = self.transform(img)
+
+        return img, label
+
+    def __len__(self):
+        return len(self.indices)
 
 
 def create_dataloader_dict(
