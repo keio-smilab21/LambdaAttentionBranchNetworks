@@ -210,6 +210,8 @@ def main(args: argparse.Namespace) -> None:
         attention_dir=args.attention_dir,
     )
 
+    test_acc = args.test_acc
+    print(f"Test_acc : {test_acc}")
     if metrics is not None:
         print(metrics.log())
         for key, value in metrics.score().items():
@@ -286,6 +288,7 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
+    parser.add_argument("--test_acc", type=float, help="test_acc when best val_loss")
 
     return parse_with_config(parser)
 

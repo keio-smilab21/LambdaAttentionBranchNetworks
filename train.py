@@ -45,6 +45,7 @@ class EarlyStopping:
         self.counter: int = 0
         self.early_stop: bool = False
         self.best_val_loss: float = np.Inf
+        self.update_test_acc: bool = False
 
     def __call__(self, val_loss: float, net: nn.Module) -> str:
         if val_loss + self.delta < self.best_val_loss:
@@ -52,13 +53,15 @@ class EarlyStopping:
             self._save_checkpoint(net)
             self.best_val_loss = val_loss
             self.counter = 0
-            return log
+            self.update_test_acc = True
+            return log, self.update_test_acc
 
         self.counter += 1
         log = f"(> {self.best_val_loss:.5f} {self.counter}/{self.patience})"
         if self.counter >= self.patience:
             self.early_stop = True
-        return log
+        self.update_test_acc = False
+        return log, self.update_test_acc
 
     def _save_checkpoint(self, net: nn.Module) -> None:
         save_path = os.path.join(self.save_dir, "checkpoint.pt")
@@ -268,6 +271,8 @@ def main(args: argparse.Namespace):
 
     criterion = data_params["criterion"]
     metric = data_params["metric"]
+    test_acc: float = 0
+    update_test_acc = False
 
     # run_name の 作成 (for save_dir / wandb)
     if args.model is not None:
@@ -330,15 +335,19 @@ def main(args: argparse.Namespace):
                     lambdas=lambdas,
                 )
 
-            metric_log = metric.log()
+            metric_log = metric.log() # acc 
             log = f"{phase}\t| {metric_log} Loss: {loss:.5f} "
 
             wandb_log(loss, metric, phase)
 
             if phase == "Val":
-                early_stopping_log = early_stopping(loss, model)
+                early_stopping_log, update_test_acc = early_stopping(loss, model)
                 log += early_stopping_log
                 scheduler.step(loss)
+            
+            if phase == "Test":
+                if update_test_acc:
+                    test_acc = metric_log
 
             print(log)
             metric.clear()
@@ -354,8 +363,10 @@ def main(args: argparse.Namespace):
 
     torch.save(model.state_dict(), os.path.join(save_dir, f"best.pt"))
     configs["val_loss"] = early_stopping.best_val_loss
+    configs["test_acc"] = test_acc
     save_json(configs, os.path.join(save_dir, "config.json"))
     print("Training Finished")
+    print(f"Test_acc ; {test_acc}")
 
 
 def parse_args():
