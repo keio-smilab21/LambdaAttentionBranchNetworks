@@ -270,8 +270,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--root_dir", type=str, default="./outputs/")
     parser.add_argument("--visualize_only", action="store_false")
     parser.add_argument("--all_class", action="store_true")
-    # recommend (step, size) in 512x512 = (1, 10000), (2, 2500), (4, 500), (8, 100), (16, 20), (32, 10), (64, 5), (128, 1)
-    # recommend (step, size) in 224x224 = (1, 500), (2, 100), (4, 20), (8, 10), (16, 5), (32, 1)
+    # recommend (size, step) in 512x512 = (1, 10000), (2, 2500), (4, 500), (8, 100), (16, 20), (32, 10), (64, 5), (128, 1)
+    # recommend (size, step) in 224x224 = (1, 500), (2, 100), (4, 20), (8, 10), (16, 5), (32, 1)
     parser.add_argument("--insdel_step", type=int, default=10)
     parser.add_argument("--block_size", type=int, default=32)
 
