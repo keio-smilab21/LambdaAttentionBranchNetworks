@@ -12,6 +12,7 @@ import wandb
 from torchinfo import summary
 from torchvision.models.resnet import Bottleneck as TorchBottleneck
 from tqdm import tqdm
+from timm.scheduler import CosineLRScheduler
 
 from data import ALL_DATASETS, create_dataloader_dict, get_parameter_depend_in_data_set
 from evaluate import test
@@ -148,10 +149,12 @@ def setting_learning_rate(
             {"params": model.perception_branch[-1].parameters(), "lr": lr_linear},
         ]
     else:
-        params = [
-            {"params": model[:-1].parameters(), "lr": lr},
-            {"params": model[-1].parameters(), "lr": lr_linear},
-        ]
+        modules = module_generator(model, reverse=True)
+        final_layer = modules.__next__()
+        params = [{"params": final_layer.parameters(), "lr": lr_linear}]
+
+        for module in modules:
+            params.append({"params": module.parameters(), "lr": lr})
 
     return params
 
@@ -264,6 +267,14 @@ def main(args: argparse.Namespace):
         patience=args.scheduler_patience,
         min_lr=args.min_lr,
         verbose=True,
+    )
+    scheduler = CosineLRScheduler(
+        optimizer,
+        t_initial=50,
+        lr_min=args.min_lr,
+        warmup_t=8,
+        warmup_lr_init=1e-5,
+        warmup_prefix=True,
     )
 
     criterion = data_params["criterion"]
