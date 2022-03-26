@@ -49,6 +49,10 @@ class Magnetogram(Dataset):
             # flag 0, 1 -> 0/ flag 2, 3 -> 1
             self.targets += list(map(lambda x: int(2 <= int(x)), annotations[1]))
 
+        if image_set == "train":
+            image_list.append(np.zeros((1, 512, 512), dtype=np.uint8))
+            self.targets += [0]
+
         self.images = np.concatenate(image_list)
 
     def __getitem__(self, index) -> Tuple[Any, Any]:
