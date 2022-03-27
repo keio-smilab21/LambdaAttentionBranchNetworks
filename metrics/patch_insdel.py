@@ -100,7 +100,7 @@ class PatchInsertionDeletion(Metric):
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
         )
 
-    def generate_insdel_images(self, mode: str):
+    def generate_insdel_images(self, mode: str, mask_mode: str="mean"):
         C, W, H = self.image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
@@ -124,8 +124,12 @@ class PatchInsertionDeletion(Metric):
 
             mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-            for c in range(C):
-                self.input[i, c] = (image[c] * mask - mean[c]) / std[c]
+            if mask_mode == "black":
+                for c in range(C):
+                    self.input[i, c] = (image[c] * mask - mean[c]) / std[c]
+            elif mask_mode == "mean":
+                for c in range(C):
+                    self.input[i, c] = mask * ((image[c] - mean[c]) / std[c])
 
     def inference(self):
         inputs = torch.Tensor(self.input)
