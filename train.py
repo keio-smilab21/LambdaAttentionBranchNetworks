@@ -46,6 +46,7 @@ class EarlyStopping:
         self.early_stop: bool = False
         self.best_val_loss: float = np.Inf
         self.update_test_acc: bool = False
+        self.test_acc: str = ""
 
     def __call__(self, val_loss: float, net: nn.Module) -> str:
         if val_loss + self.delta < self.best_val_loss:
@@ -61,7 +62,7 @@ class EarlyStopping:
         if self.counter >= self.patience:
             self.early_stop = True
         self.update_test_acc = False
-        return log, self.update_test_acc
+        return log
 
     def _save_checkpoint(self, net: nn.Module) -> None:
         save_path = os.path.join(self.save_dir, "checkpoint.pt")
@@ -271,8 +272,6 @@ def main(args: argparse.Namespace):
 
     criterion = data_params["criterion"]
     metric = data_params["metric"]
-    test_acc: float = 0
-    update_test_acc = False
 
     # run_name の 作成 (for save_dir / wandb)
     if args.model is not None:
@@ -341,13 +340,13 @@ def main(args: argparse.Namespace):
             wandb_log(loss, metric, phase)
 
             if phase == "Val":
-                early_stopping_log, update_test_acc = early_stopping(loss, model)
+                early_stopping_log = early_stopping(loss, model)
                 log += early_stopping_log
                 scheduler.step(loss)
             
             if phase == "Test":
-                if update_test_acc:
-                    test_acc = metric_log
+                if early_stopping.update_test_acc:
+                    early_stopping.test_acc = metric_log
 
             print(log)
             metric.clear()
@@ -363,10 +362,10 @@ def main(args: argparse.Namespace):
 
     torch.save(model.state_dict(), os.path.join(save_dir, f"best.pt"))
     configs["val_loss"] = early_stopping.best_val_loss
-    configs["test_acc"] = test_acc
+    configs["test_acc"] = early_stopping.test_acc
     save_json(configs, os.path.join(save_dir, "config.json"))
     print("Training Finished")
-    print(f"Test_acc ; {test_acc}")
+    print(f"Test_acc ; {early_stopping.test_acc}")
 
 
 def parse_args():
