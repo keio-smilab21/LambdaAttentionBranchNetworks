@@ -45,8 +45,8 @@ class EarlyStopping:
         self.counter: int = 0
         self.early_stop: bool = False
         self.best_val_loss: float = np.Inf
-        self.update_test_acc: bool = False
-        self.test_acc: str = ""
+        self.is_improve_val_loss: bool = False
+        self.metric_log: str = ""
 
     def __call__(self, val_loss: float, net: nn.Module) -> str:
         if val_loss + self.delta < self.best_val_loss:
@@ -54,14 +54,14 @@ class EarlyStopping:
             self._save_checkpoint(net)
             self.best_val_loss = val_loss
             self.counter = 0
-            self.update_test_acc = True
-            return log, self.update_test_acc
+            self.is_improve_val_loss = True
+            return log
 
         self.counter += 1
         log = f"(> {self.best_val_loss:.5f} {self.counter}/{self.patience})"
         if self.counter >= self.patience:
             self.early_stop = True
-        self.update_test_acc = False
+        self.is_improve_val_loss = False
         return log
 
     def _save_checkpoint(self, net: nn.Module) -> None:
@@ -345,8 +345,8 @@ def main(args: argparse.Namespace):
                 scheduler.step(loss)
             
             if phase == "Test":
-                if early_stopping.update_test_acc:
-                    early_stopping.test_acc = metric_log
+                if early_stopping.is_improve_val_loss:
+                    early_stopping.metric_log = metric_log
 
             print(log)
             metric.clear()
@@ -362,10 +362,10 @@ def main(args: argparse.Namespace):
 
     torch.save(model.state_dict(), os.path.join(save_dir, f"best.pt"))
     configs["val_loss"] = early_stopping.best_val_loss
-    configs["test_acc"] = early_stopping.test_acc
+    configs["test_acc"] = early_stopping.metric_log
     save_json(configs, os.path.join(save_dir, "config.json"))
     print("Training Finished")
-    print(f"Test_acc ; {early_stopping.test_acc}")
+    print(f"Test_acc ; {early_stopping.metric_log}")
 
 
 def parse_args():
