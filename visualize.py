@@ -86,10 +86,11 @@ def visualize(
     device: torch.device,
     evaluate: bool = False,
     attention_dir: Optional[str] = None,
+    mask_mode: str = "black",
 ) -> Union[None, Metric]:
     if evaluate:
         pid = PatchInsertionDeletion(
-            model, batch_size, patch_size, step, params["name"], device
+            model, batch_size, patch_size, step, params["name"], device, mask_mode=mask_mode
         )
         insdel_save_dir = os.path.join(save_dir, "insdel")
         if not os.path.isdir(insdel_save_dir):
@@ -208,6 +209,7 @@ def main(args: argparse.Namespace) -> None:
         device,
         args.visualize_only,
         attention_dir=args.attention_dir,
+        mask_mode = args.mask_mode
     )
 
     test_acc = args.test_acc
@@ -289,6 +291,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--test_acc", type=float, help="test_acc when best val_loss")
+    parser.add_argument("--mask_mode", type=str, choices=["black", "mean", "blur"], default="black")
 
     return parse_with_config(parser)
 
