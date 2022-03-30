@@ -273,6 +273,7 @@ def lambda_resnet50(**kwargs):
         progress (bool): If True, displays a progress bar of the download to stderr
     """
     return LambdaResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    # return LambdaResNet(Bottleneck, [3, 3, 9, 3], **kwargs)
 
 
 def lambda_resnet101(**kwargs):

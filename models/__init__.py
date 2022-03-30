@@ -6,10 +6,11 @@ import torch.nn as nn
 from torchvision.models.resnet import resnet18, resnet50
 
 from models.attention_branch import add_attention_branch
-from models.lambda_resnet import lambda_resnet50
+from models.lambda_resnet import lambda_resnet50, lambda_resnet26
 from models.cnn import CNNModel
+from models.model_cnn import model_CNN_3
 
-ALL_MODELS = ["lambda_resnet", "resnet", "resnet50", "CNN"]
+ALL_MODELS = ["lambda_resnet", "resnet", "resnet50", "CNN", "CNN3", "lambda_resnet26"]
 
 
 def change_num_classes(
@@ -101,6 +102,15 @@ def create_model(
     elif base_model == "CNN":
         model = CNNModel(num_channel=num_channel)
         layer_index = {"layer1": 4, "layer2": 4}
+        add_flatten = False
+    elif base_model == "CNN3":
+        model = model_CNN_3(num_channels=num_channel, num_classes=2)
+        layer_index = {"layer1": 5, "layer2": 5}
+        add_flatten = False
+    elif base_model == "lambda_resnet_26":
+        model = lambda_resnet26()
+        layer_index = {"layer1": -6, "layer2": -5, "layer3": -4}
+        # コードを直接変更してnn.flattenにしているためFalse
         add_flatten = False
     else:
         return None
