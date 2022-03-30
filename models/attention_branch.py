@@ -250,7 +250,7 @@ def add_attention_branch(
     base_modelをAttentionBranch化
     Args:
         base_model(nn.Module): ベースとするモデル
-        division_index(int)  : モデルの分割一
+        division_index(int)  : モデルの分割位置
         num_classes(int)     : クラス数
 
     Returns:
@@ -264,6 +264,7 @@ def add_attention_branch(
     # pre_modelの最終層のチャンネル数を合わせる
     # children()はSequential入れ子に入れないのでもう一度children()
     final_layer = module_generator(modules[division_index], reverse=True)
+
     for module in final_layer:
         if isinstance(module, nn.modules.batchnorm._NormBase):
             # TODO なんで2？多分この後に1/2してるけどSequentialで取れてない
@@ -272,6 +273,10 @@ def add_attention_branch(
         elif isinstance(module, nn.modules.conv._ConvNd):
             inplanes = module.out_channels
             break
+        elif isinstance(module, nn.modules.conv.Conv2d):
+            inplanes = module.out_channels
+            break
+    
 
     return AttentionBranchModel(
         pre_model,
