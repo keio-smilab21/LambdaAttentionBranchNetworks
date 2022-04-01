@@ -124,9 +124,9 @@ class PatchInsertionDeletion(Metric):
 
             if mask_mode == "blur":
                 src_image = image # 元画像(3, 224, 224) -> RGB
-                blur_image = cv2.blur(inverse_channel(image), (3,3))
-                blur_image = inverse_channel(blur_image)
-                # blur_image = cv2.blur(inverse_channel(image), (5,5)) # ぼかし画像
+                blur_image = cv2.blur(image.transpose(1,2,0), (W//10, H//10)) # (224, 224, 3)
+                blur_image = blur_image.transpose(2,0,1)
+                # blur_image = inverse_channel(blur_image)
                 
                 if mode == "insertion":
                     mask_src = np.where(threthold <= self.patch_attention, 1, 0)
@@ -144,12 +144,12 @@ class PatchInsertionDeletion(Metric):
             # if i%10 == 0:
             #     # img = self.input[i].transpose(1,2,0)
             #     img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
-            #     # img = src_image.transpose(1,2,0)
+            #     # img = blur_image.transpose(1,2,0)
             #     fig, ax = plt.subplots()
             #     im = ax.imshow(img, vmin=0, vmax=1)
             #     fig.colorbar(im)
-            #     # plt.savefig(f"{mode}/self.input[{i}].png")
             #     plt.savefig(f"{mode}/self.input[{i}].png")
+            #     # plt.savefig(f"{mode}/blur_image[{i}].png")
             #     plt.clf()
             #     plt.close()
 
@@ -166,27 +166,6 @@ class PatchInsertionDeletion(Metric):
                         self.input[i, c] = (image[c] * mask - mean[c]) / std[c]
                     elif mask_mode == "mean":
                         self.input[i, c] = mask * ((image[c] - mean[c]) / std[c])
-            # if i%10 == 0:
-            #     # img = self.input[i].transpose(1,2,0)
-            #     img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
-            #     # img = src_image.transpose(1,2,0)
-            #     fig, ax = plt.subplots()
-            #     im = ax.imshow(img, vmin=0, vmax=1)
-            #     fig.colorbar(im)
-            #     # plt.savefig(f"{mode}/self.input[{i}].png")
-            #     plt.savefig(f"{mode}/self.input[{i}].png")
-            #     plt.clf()
-            #     plt.close()
-            # if i % 10 == 0:
-            #     img = blur_image.transpose(1,2,0)
-            #     fig, ax = plt.subplots()
-            #     im = ax.imshow(img, vmin=0, vmax=1)
-            #     fig.colorbar(im)
-            #     # plt.savefig(f"{mode}/self.input[{i}].png")
-            #     plt.savefig(f"{mode}/blur_image[{i}].png")
-            #     plt.clf()
-            #     plt.close()
-
 
     def inference(self):
         inputs = torch.Tensor(self.input)
