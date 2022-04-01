@@ -124,9 +124,9 @@ class PatchInsertionDeletion(Metric):
 
             if mask_mode == "blur":
                 src_image = image # 元画像(3, 224, 224) -> RGB
-                blur_image = cv2.blur(image.transpose(1,2,0), (W//10, H//10)) # (224, 224, 3)
-                blur_image = blur_image.transpose(2,0,1)
-                # blur_image = inverse_channel(blur_image)
+                blur_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
+                if len(blur_image.shape) == 3:
+                    blur_image = blur_image.transpose(2,0,1) # (3, 224, 224)
                 
                 if mode == "insertion":
                     mask_src = np.where(threthold <= self.patch_attention, 1, 0)
@@ -141,17 +141,17 @@ class PatchInsertionDeletion(Metric):
                 for c in range(C):
                     self.input[i, c] = src_image[c] * mask_src +  blur_image[c] * mask_blur
                 
-            # if i%10 == 0:
-            #     # img = self.input[i].transpose(1,2,0)
-            #     img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
-            #     # img = blur_image.transpose(1,2,0)
-            #     fig, ax = plt.subplots()
-            #     im = ax.imshow(img, vmin=0, vmax=1)
-            #     fig.colorbar(im)
-            #     plt.savefig(f"{mode}/self.input[{i}].png")
-            #     # plt.savefig(f"{mode}/blur_image[{i}].png")
-            #     plt.clf()
-            #     plt.close()
+                if i%10 == 0:
+                    # img = self.input[i].transpose(1,2,0)
+                    img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
+                    # img = blur_image.transpose(1,2,0)
+                    fig, ax = plt.subplots()
+                    im = ax.imshow(img, vmin=0, vmax=1)
+                    fig.colorbar(im)
+                    plt.savefig(f"{mode}/self.input[{i}].png")
+                    # plt.savefig(f"{mode}/blur_image[{i}].png")
+                    plt.clf()
+                    plt.close()
 
             else:
                 if mode == "insertion":
@@ -166,6 +166,20 @@ class PatchInsertionDeletion(Metric):
                         self.input[i, c] = (image[c] * mask - mean[c]) / std[c]
                     elif mask_mode == "mean":
                         self.input[i, c] = mask * ((image[c] - mean[c]) / std[c])
+                    
+                    if i%10 == 0:
+                        img = self.input[i].transpose(1,2,0)
+                        # img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
+                        # img = blur_image.transpose(1,2,0)
+                        fig, ax = plt.subplots()
+                        im = ax.imshow(img, vmin=0, vmax=1)
+                        fig.colorbar(im)
+                        plt.savefig(f"{mode}/self.input[{i}].png")
+                        # plt.savefig(f"{mode}/blur_image[{i}].png")
+                        plt.clf()
+                        plt.close()
+                    
+                    
 
     def inference(self):
         inputs = torch.Tensor(self.input)
@@ -285,6 +299,19 @@ def inverse_channel(image):
     Input : (3, XX, XX)を想定
     """
     return image[::-1, ...]
+
+def save_mask_image(img,  mode):
+        # img = self.input[i].transpose(1,2,0)
+        # img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
+        # img = blur_image.transpose(1,2,0)
+        fig, ax = plt.subplots()
+        im = ax.imshow(img, vmin=0, vmax=1)
+        fig.colorbar(im)
+        plt.savefig(f"{mode}/self.input[{i}].png")
+        # plt.savefig(f"{mode}/blur_image[{i}].png")
+        plt.clf()
+        plt.close()
+
 
 def save_pid_image(i, image, mask=None, mode="temp"):
     """
