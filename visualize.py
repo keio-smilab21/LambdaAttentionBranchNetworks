@@ -291,7 +291,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--test_acc", type=float, help="test_acc when best val_loss")
-    parser.add_argument("--mask_mode", type=str, choices=["black", "mean", "blur"], default="black")
+    parser.add_argument("--mask_mode", type=str, choices=["black", "mean", "blur", "base"], default="black")
 
     return parse_with_config(parser)
 

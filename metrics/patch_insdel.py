@@ -4,11 +4,14 @@ from typing import Dict, Union
 
 import cv2
 from cv2 import blur
+from matplotlib.animation import ImageMagickBase
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from PIL import Image
+
 from data import get_parameter_depend_in_data_set
 from utils.utils import reverse_normalize
 from utils.visualize import save_data_as_plot, save_image
@@ -122,37 +125,46 @@ class PatchInsertionDeletion(Metric):
             h_indices = self.order[1, step_index]
             threthold = self.patch_attention[w_indices, h_indices]
 
-            if mask_mode == "blur":
+            if mask_mode in ["blur", "base"]:
                 src_image = image # 元画像(3, 224, 224) -> RGB
-                blur_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
-                if len(blur_image.shape) == 3:
-                    blur_image = blur_image.transpose(2,0,1) # (3, 224, 224)
+
+                if mask_mode == "blur":
+                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
+                elif mask_mode == "base":
+                    base_mask_image = np.asarray(Image.open("./metrics/magnetogram_baseline.png").resize((H, W)))
+                
+                if len(base_mask_image) == 3:
+                    base_mask_image = base_mask_image.transpose(2, 0, 1)
                 
                 if mode == "insertion":
                     mask_src = np.where(threthold <= self.patch_attention, 1, 0)
-                    mask_blur = np.where(threthold <= self.patch_attention, 0, 1)
+                    mask_base = np.where(threthold <= self.patch_attention, 0, 1)
                 elif mode == "deletion":
                     mask_src = np.where(threthold <= self.patch_attention, 0, 1)
-                    mask_blur = np.where(threthold <= self.patch_attention, 1, 0)
+                    mask_base = np.where(threthold <= self.patch_attention, 1, 0)
 
                 mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-                mask_blur = cv2.resize(mask_blur, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+                mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
                 for c in range(C):
-                    self.input[i, c] = src_image[c] * mask_src +  blur_image[c] * mask_blur
+                    self.input[i, c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
                 
-                if i%10 == 0:
+                if i%15 == 0:
                     # img = self.input[i].transpose(1,2,0)
-                    img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
+                    img = (src_image*mask_src + base_mask_image*mask_base).transpose(1,2,0) # (XX, XX, 1(3))
                     # img = blur_image.transpose(1,2,0)
+                    # save_pid_image(i, img, mode=mode)
                     fig, ax = plt.subplots()
-                    im = ax.imshow(img, vmin=0, vmax=1)
+                    if img.shape[-1] == 1:
+                        im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                    else:
+                        im = ax.imshow(img, vmin=0, vmax=1)
                     fig.colorbar(im)
                     plt.savefig(f"{mode}/self.input[{i}].png")
-                    # plt.savefig(f"{mode}/blur_image[{i}].png")
+                    # plt.savefig(f”{mode}/blur_image[{i}].png”)
                     plt.clf()
                     plt.close()
-
+            
             else:
                 if mode == "insertion":
                     mask = np.where(threthold <= self.patch_attention, 1, 0)
@@ -167,18 +179,9 @@ class PatchInsertionDeletion(Metric):
                     elif mask_mode == "mean":
                         self.input[i, c] = mask * ((image[c] - mean[c]) / std[c])
                     
-                    if i%10 == 0:
-                        img = self.input[i].transpose(1,2,0)
-                        # img = (src_image*mask_src + blur_image*mask_blur).transpose(1,2,0)
-                        # img = blur_image.transpose(1,2,0)
-                        fig, ax = plt.subplots()
-                        im = ax.imshow(img, vmin=0, vmax=1)
-                        fig.colorbar(im)
-                        plt.savefig(f"{mode}/self.input[{i}].png")
-                        # plt.savefig(f"{mode}/blur_image[{i}].png")
-                        plt.clf()
-                        plt.close()
-                    
+                if i%10 == 0:
+                    img = self.input[i].transpose(1,2,0)
+                    save_pid_image(i, img, mode=mode)
                     
 
     def inference(self):
@@ -317,22 +320,17 @@ def save_pid_image(i, image, mask=None, mode="temp"):
     """
     Insertion / Deletionの画像を保存するようの関数
     """
-    if mask is None:
-        fig, ax = plt.subplots()
-        im = ax.imshow(img, vmin=0, vmax=1)
-        fig.colorbar(im)
-        plt.savefig(f"{mode}/self.input[{i}].png")
-        plt.clf()
-        plt.close()
+    if mask is not None:
+        image = (image*mask).transpose(1,2,0)
+    fig, ax = plt.subplots()
+    if image.shape[0] == 1:
+        im = ax.imshow(image ,vmin=0, vmax=1, cmap="gray")
     else:
-        # img = self.input[i].transpose(1,2,0)
-        img = (image*mask).transpose(1,2,0)
-        fig, ax = plt.subplots()
-        im = ax.imshow(img, vmin=0, vmax=1)
-        fig.colorbar(im)
-        plt.savefig(f"{mode}/self.input[{i}].png")
-        plt.clf()
-        plt.close()
+        im = ax.imshow(image, vmin=0, vmax=1)
+    fig.colorbar(im)
+    plt.savefig(f"{mode}/self.input[{i}].png")
+    plt.clf()
+    plt.close()
 
 def auc(arr):
     """Returns normalized Area Under Curve of the array."""
