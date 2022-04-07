@@ -5,10 +5,7 @@
     "add_attention_branch": true,
     "div": "layer2",
     "theta_att": 0.75,
-    "freeze": [
-        "fe",
-        "perception"
-    ],
+    "freeze": [],
     "trainable_bottleneck": 0,
     "dataset": "IDRiD",
     "image_size": 224,
