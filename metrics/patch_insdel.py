@@ -131,7 +131,8 @@ class PatchInsertionDeletion(Metric):
                 if mask_mode == "blur":
                     base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
                 elif mask_mode == "base":
-                    base_mask_image = np.asarray(Image.open("./metrics/magnetogram_baseline.png").resize((H, W)))
+                    base_mask_image = Image.open("./metrics/magnetogram_baseline.png").resize((H, W))
+                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 256.0
                 
                 if len(base_mask_image) == 3:
                     base_mask_image = base_mask_image.transpose(2, 0, 1)
@@ -152,13 +153,13 @@ class PatchInsertionDeletion(Metric):
                 if i%15 == 0:
                     # img = self.input[i].transpose(1,2,0)
                     img = (src_image*mask_src + base_mask_image*mask_base).transpose(1,2,0) # (XX, XX, 1(3))
-                    # img = blur_image.transpose(1,2,0)
+                    # img = base_mask_image
                     # save_pid_image(i, img, mode=mode)
                     fig, ax = plt.subplots()
                     if img.shape[-1] == 1:
                         im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                     else:
-                        im = ax.imshow(img, vmin=0, vmax=1)
+                        im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                     fig.colorbar(im)
                     plt.savefig(f"{mode}/self.input[{i}].png")
                     # plt.savefig(f”{mode}/blur_image[{i}].png”)
@@ -186,19 +187,26 @@ class PatchInsertionDeletion(Metric):
 
     def inference(self):
         inputs = torch.Tensor(self.input)
+        print("inputs", inputs.shape)
 
         num_iter = math.ceil(inputs.size(0) / self.batch_size)
+        print("num_iter: ", num_iter)
         result = torch.zeros(0)
 
         for iter in range(num_iter):
             start = self.batch_size * iter
+            print("start : ", start)
             batch_inputs = inputs[start : start + self.batch_size].to(self.device)
+            print("batch_inputs : ", batch_inputs.shape)
 
             outputs = self.model(batch_inputs)
+            print(outputs)
 
             outputs = F.softmax(outputs, 1)
             outputs = outputs[:, self.label]
             result = torch.cat([result, outputs.cpu().detach()], dim=0)
+
+        print("result : ", result)
 
         return np.nan_to_num(result)
 
