@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torchinfo import summary
 
+from lambda_layer import LambdaLayer
+from lambda_resnet import conv1x1, Bottleneck
 
 class model_CNN_3(nn.Module):
     """
@@ -19,6 +21,14 @@ class model_CNN_3(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, 
                                 stride=2, padding=0, bias=False)
         self.bn2 = nn.BatchNorm2d(32)
+
+        downsample = nn.Sequential(
+            conv1x1(16, 8 * 4, 1),
+            nn.BatchNorm2d(8 * 4),
+        )
+        self.layer1 = Bottleneck(
+            16, 8, 1, downsample=downsample, norm_layer=nn.BatchNorm2d, size=28
+        )
         
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3,
                                 stride=2, padding=1, bias=False)
@@ -31,16 +41,17 @@ class model_CNN_3(nn.Module):
     def forward(self, x):
         x = self.conv1(x)
         x = self.relu(x)
-        # x = self.maxpool(x)
+        x = self.maxpool(x)
         
         x = self.conv2(x)
         x = self.relu(x)
-        x = self.maxpool(x) 
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
 
         x = self.conv3(x)
         x =  self.relu(x) 
         x = self.avgpool(x) # 32, 32, 32, 32
-        print(x.size()) # 32, 32, 1, 1
 
         x = torch.flatten(x, 1)
         x = self.fc(x)
@@ -49,6 +60,8 @@ class model_CNN_3(nn.Module):
 
 def main():
     model = model_CNN_3(num_channels=3, num_classes=2)
+    modules = list(model.children())
+    print("modules: ", modules)
     summary(model, input_size=(32, 3, 512, 512))
 
 if __name__=="__main__":
