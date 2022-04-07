@@ -153,13 +153,13 @@ class PatchInsertionDeletion(Metric):
                 if i%15 == 0:
                     # img = self.input[i].transpose(1,2,0)
                     img = (src_image*mask_src + base_mask_image*mask_base).transpose(1,2,0) # (XX, XX, 1(3))
-                    # img = base_mask_image
+                    # img = blur_image.transpose(1,2,0)
                     # save_pid_image(i, img, mode=mode)
                     fig, ax = plt.subplots()
                     if img.shape[-1] == 1:
                         im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                     else:
-                        im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                        im = ax.imshow(img, vmin=0, vmax=1)
                     fig.colorbar(im)
                     plt.savefig(f"{mode}/self.input[{i}].png")
                     # plt.savefig(f”{mode}/blur_image[{i}].png”)
