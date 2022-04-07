@@ -66,7 +66,7 @@ def save_image(
     image = np.transpose(image, (1, 2, 0))
 
     fig, ax = plt.subplots()
-    if image.shape[0] == 1:
+    if image.shape[-1] == 1:
         im = ax.imshow(image, cmap="gray", vmin=0, vmax=1)
     else:
         im = ax.imshow(image, vmin=0, vmax=1)
