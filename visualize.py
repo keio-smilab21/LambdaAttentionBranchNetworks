@@ -11,6 +11,7 @@ from tqdm import tqdm
 import wandb
 
 from data import ALL_DATASETS, get_parameter_depend_in_data_set, create_dataloader_dict
+from evaluate import test
 from metrics.base import Metric
 from metrics.patch_insdel import PatchInsertionDeletion
 from models import ALL_MODELS, create_model
@@ -90,7 +91,7 @@ def visualize(
 ) -> Union[None, Metric]:
     if evaluate:
         pid = PatchInsertionDeletion(
-            model, batch_size, patch_size, step, params["name"], device, mask_mode=mask_mode
+            model, batch_size, patch_size, step, params["name"], device, mask_mode=mask_mode, dataloader=dataloader
         )
         insdel_save_dir = os.path.join(save_dir, "insdel")
         if not os.path.isdir(insdel_save_dir):
@@ -147,7 +148,7 @@ def main(args: argparse.Namespace) -> None:
     dataloader = dataloader_dict["Test"]
     assert isinstance(dataloader, data.DataLoader)
 
-    params = get_parameter_depend_in_data_set(args.dataset)
+    params = get_parameter_depend_in_data_set(args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device))
 
     mask_path = os.path.join(args.root_dir, "masks.npy")
     if not os.path.isfile(mask_path):

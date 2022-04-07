@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from PIL import Image
 
 from data import get_parameter_depend_in_data_set
+from evaluate import test
 from utils.utils import reverse_normalize
 from utils.visualize import save_data_as_plot, save_image
 
@@ -30,6 +31,7 @@ class PatchInsertionDeletion(Metric):
         dataset: str,
         device: torch.device,
         mask_mode: str,
+        dataloader
     ) -> None:
         self.total = 0
         self.total_insertion = 0
@@ -132,23 +134,26 @@ class PatchInsertionDeletion(Metric):
                     base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
                 elif mask_mode == "base":
                     base_mask_image = Image.open("./metrics/magnetogram_baseline.png").resize((H, W))
-                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 256.0
+                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
                 
                 if len(base_mask_image) == 3:
                     base_mask_image = base_mask_image.transpose(2, 0, 1)
                 
                 if mode == "insertion":
-                    mask_src = np.where(threthold <= self.patch_attention, 1, 0)
-                    mask_base = np.where(threthold <= self.patch_attention, 0, 1)
+                    mask_src = np.where(threthold <= self.patch_attention, 1.0, 0.0)
+                    mask_base = np.where(threthold <= self.patch_attention, 0.0, 1.0)
                 elif mode == "deletion":
-                    mask_src = np.where(threthold <= self.patch_attention, 0, 1)
-                    mask_base = np.where(threthold <= self.patch_attention, 1, 0)
+                    mask_src = np.where(threthold <= self.patch_attention, 0.0, 1.0)
+                    mask_base = np.where(threthold <= self.patch_attention, 1.0, 0.0)
 
                 mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
                 mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
                 for c in range(C):
                     self.input[i, c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
+                    print(np.sum(mask_base))
+                    self.input[i, c] = base_mask_image[c] * mask_base
+                    self.input[i, c] = (self.input[i, c] - mean[c]) / std[c]
                 
                 if i%15 == 0:
                     # img = self.input[i].transpose(1,2,0)
@@ -165,7 +170,7 @@ class PatchInsertionDeletion(Metric):
                     # plt.savefig(f”{mode}/blur_image[{i}].png”)
                     plt.clf()
                     plt.close()
-            
+
             else:
                 if mode == "insertion":
                     mask = np.where(threthold <= self.patch_attention, 1, 0)
@@ -186,18 +191,19 @@ class PatchInsertionDeletion(Metric):
                     
 
     def inference(self):
-        inputs = torch.Tensor(self.input)
-        print("inputs", inputs.shape)
+        inputs = torch.Tensor(self.input) # (26, 1, 512, 512)
+        params = get_parameter_depend_in_data_set(self.dataset)
+        for i, image in enumerate(inputs):
+            save_image(image.detach().cpu().numpy(), f"temp/{self.total}_{i}", params["mean"], params["std"])
+            # save_image(image.detach().cpu().numpy(), f"temp/{self.total}_{i}", (0,), (1,))
 
-        num_iter = math.ceil(inputs.size(0) / self.batch_size)
-        print("num_iter: ", num_iter)
+        num_iter = math.ceil(inputs.size(0) / self.batch_size) # 4
         result = torch.zeros(0)
 
         for iter in range(num_iter):
-            start = self.batch_size * iter
-            print("start : ", start)
-            batch_inputs = inputs[start : start + self.batch_size].to(self.device)
-            print("batch_inputs : ", batch_inputs.shape)
+            start = self.batch_size * iter # 0->8->16->24
+            batch_inputs = inputs[start : start + self.batch_size].to(self.device) # (8, 1, 512, 512)
+            # print(batch_inputs.dtype)
 
             outputs = self.model(batch_inputs)
             print(outputs)
@@ -206,7 +212,7 @@ class PatchInsertionDeletion(Metric):
             outputs = outputs[:, self.label]
             result = torch.cat([result, outputs.cpu().detach()], dim=0)
 
-        print("result : ", result)
+        print(result[-1])
 
         return np.nan_to_num(result)
 
