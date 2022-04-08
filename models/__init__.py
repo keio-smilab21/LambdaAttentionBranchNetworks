@@ -104,7 +104,7 @@ def create_model(
         add_flatten = False
     elif base_model == "CNN3":
         model = model_CNN_3(num_channels=num_channel, num_classes=2)
-        layer_index = {"layer1": 4, "layer2": 4}
+        layer_index = {"layer1": 3, "layer2": 3}
         add_flatten = False
     elif base_model == "lambda_resnet_26":
         model = lambda_resnet26()
