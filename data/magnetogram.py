@@ -1,3 +1,4 @@
+from audioop import bias
 import csv
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -18,7 +19,7 @@ class Magnetogram(Dataset):
     def __init__(
         self,
         root: str,
-        image_set: str,
+        image_set: str, # train/val/test
         params: Dict[str, Any],
         transform: Optional[Callable] = None,
     ) -> None:
@@ -43,13 +44,22 @@ class Magnetogram(Dataset):
                 annotations = [row for row in reader]
 
             # Transpose [Image_fname, Label]
-            annotations = [list(x) for x in zip(*annotations)]
+            annotations = [list(x) for x in zip(*annotations)] # (image_name, label, year) * 7990
 
             image_list.append(np.load(image_file))
             # flag 0, 1 -> 0/ flag 2, 3 -> 1
-            self.targets += list(map(lambda x: int(2 <= int(x)), annotations[1]))
+            self.targets += list(map(lambda x: int(2 <= int(x)), annotations[1])) # 45530
 
-        self.images = np.concatenate(image_list)
+        self.images = np.concatenate(image_list) # (7990, 512, 512)
+
+        # add bias_image only when train
+        if image_set == "train":
+            self.targets += [0]
+            bias_image = Image.open("./datasets/magnetogram/bias_image.png").resize((512, 512))
+            bias_image = np.asarray(bias_image, dtype=np.uint8)
+            bias_image = bias_image[np.newaxis]
+            self.images = np.concatenate([self.images, bias_image])
+
 
     def __getitem__(self, index) -> Tuple[Any, Any]:
         image = Image.fromarray(self.images[index])
