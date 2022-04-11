@@ -3,18 +3,19 @@ import torch
 
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import BatchSampler
-
+from tqdm import tqdm
 
 class BalancedBatchSampler(BatchSampler):
     """
-    BatchSampler - from a MNIST-like dataset, samples n_classes and within these classes samples n_samples.
+    BatchSampler - from a MNIST-like dataset, samples n_classes and w"""  """ithin these classes samples n_samples.
     Returns batches of size n_classes * n_samples
     """
 
     def __init__(self, dataset, n_classes, n_samples):
+        print("Batch Sampling ...")
         loader = DataLoader(dataset)
         self.labels_list = []
-        for _, label in loader:
+        for _, label in tqdm(loader):
             self.labels_list.append(label)
         self.labels = torch.LongTensor(self.labels_list)
         self.labels_set = list(set(self.labels.numpy()))
@@ -22,7 +23,7 @@ class BalancedBatchSampler(BatchSampler):
             label: np.where(self.labels.numpy() == label)[0]
             for label in self.labels_set
         }
-        for l in self.labels_set:
+        for l in tqdm(self.labels_set):
             np.random.shuffle(self.label_to_indices[l])
         self.used_label_indices_count = {label: 0 for label in self.labels_set}
         self.count = 0

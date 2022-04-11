@@ -65,6 +65,7 @@ class Wrapper_CNN(nn.Module):
         x = self.layer1(x)
 
         return x
+
 class PB_CNN(nn.Module):
     def __init__(self, num_channels: int, num_classes: int=1000):
         super().__init__()
@@ -93,6 +94,7 @@ class PB_CNN(nn.Module):
         # # h = x.view(x.size(0), -1) # for ib_loss | output : (32, 32)
 
         x = self.flatten(x) # output : (32, 32)
+        self.x = x
         self.features = torch.sum(torch.abs(x), 1).reshape(-1, 1)
 
         x = self.fc(x)

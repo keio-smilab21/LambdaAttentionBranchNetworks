@@ -1,6 +1,7 @@
 from audioop import bias
 import csv
 import os
+import torch
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -62,12 +63,15 @@ class Magnetogram(Dataset):
 
 
     def __getitem__(self, index) -> Tuple[Any, Any]:
-        image = Image.fromarray(self.images[index])
-
-        target = self.targets[index]
-
-        if self.transform is not None:
-            image = self.transform(image)
+        path = f"./datasets/images/magnetogram{index}.pth"
+        image, target = None, self.targets[index] 
+        if os.path.exists(path):
+            image = torch.load(path)
+        else:   
+            image = Image.fromarray(self.images[index])
+            if self.transform is not None:
+                image = self.transform(image)
+            torch.save(image,path)
 
         return image, target
 

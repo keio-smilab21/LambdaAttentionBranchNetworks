@@ -15,8 +15,10 @@ from tqdm import tqdm
 
 from data import ALL_DATASETS, create_dataloader_dict, get_parameter_depend_in_data_set
 from evaluate import test
+from losses.ibloss import IB_Loss, ib_loss
 from metrics.base import Metric
 from models import ALL_MODELS, create_model
+from models.cnn import PB_CNN, Wrapper_CNN
 from models.attention_branch import AttentionBranchModel
 from models.attention_branch import Bottleneck as ABNBottleneck
 from models.lambda_resnet import Bottleneck as LambdaBottleneck
@@ -197,7 +199,10 @@ def train(
         optimizer.zero_grad()
         outputs = model(inputs)
 
-        loss = calculate_loss(criterion, outputs, labels, model, lambdas)
+        if isinstance(model.perception_branch[0], PB_CNN):
+            loss = criterion(inputs, labels, model.perception_branch[0].features)
+        else:
+            loss = calculate_loss(criterion, outputs, labels, model, lambdas)
         loss.backward()
         total_loss += loss.item()
         metric.evaluate(outputs, labels)

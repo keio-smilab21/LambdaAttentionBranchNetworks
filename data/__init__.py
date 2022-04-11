@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
-from losses.ibloss import IBLoss, ib_loss
+from losses.ibloss import IB_Loss, ib_loss
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -135,7 +135,7 @@ def get_parameter_depend_in_data_set(
     if loss_type == "CE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif loss_type == "IB":
-        params["criterion"] = IBLoss()
+        params["criterion"] = IB_Loss()
     else:
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     # print("criterion : ", params["criterion"])

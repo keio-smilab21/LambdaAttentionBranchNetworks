@@ -13,9 +13,9 @@ def ib_loss(input_values, ib):
     return loss.mean()
 
 
-class IBLoss(nn.Module):
+class IB_Loss(nn.Module):
     def __init__(self, weight: float = None, num_classes: int = 2, alpha: float = 10000.):
-        super(IBLoss, self).__init__()
+        super(IB_Loss, self).__init__()
         assert alpha > 0
         self.alpha = alpha
         self.num_classes = num_classes
