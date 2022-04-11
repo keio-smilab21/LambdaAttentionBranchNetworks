@@ -32,8 +32,6 @@ def test(
     for data in tqdm(dataloader, desc=f"{phase}: "):
         inputs, labels = data[0].to(device), data[1].to(device)
         outputs = model(inputs)
-        if total >= 1950:
-            print(outputs)
         total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
         metrics.evaluate(outputs, labels)
         total += labels.size(0)

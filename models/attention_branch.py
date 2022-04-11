@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from utils.utils import module_generator
+from models.cnn import Wrapper_CNN
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -223,7 +224,7 @@ class AttentionBranchModel(nn.Module):
         self.theta_attention = theta_attention
 
     def forward(self, x):
-        x = self.feature_extractor(x)
+        x = self.feature_extractor(x) # (8, 16, 128, 128)
 
         # For Attention Loss
         self.attention_pred = self.attention_branch(x)
@@ -271,7 +272,10 @@ def add_attention_branch(
             inplanes = module.num_features // 2
             break
         elif isinstance(module, nn.modules.conv._ConvNd):
-            inplanes = module.out_channels
+            if isinstance(base_model, Wrapper_CNN):
+                inplanes = 16
+            else:
+                inplanes = module.out_channels
             break
         elif isinstance(module, nn.modules.conv.Conv2d):
             inplanes = module.out_channels

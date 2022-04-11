@@ -133,9 +133,6 @@ class LambdaBasicBlock(nn.Module):
         self.yc = self.conv2.yc
 
         out = self.bn2(out)
-        print("out : ", out.size())
-
-        print("ssss", self.shortcut(x).size())
         out += self.shortcut(x)
 
         out = self.relu(out)

@@ -1,4 +1,5 @@
 import os
+from statistics import mode
 from typing import List, Optional
 
 import torch
@@ -7,9 +8,9 @@ from torchvision.models.resnet import resnet18, resnet50
 
 from models.attention_branch import add_attention_branch
 from models.lambda_resnet import lambda_resnet50, lambda_resnet26
-from models.cnn import CNNModel, model_CNN_3
+from models.cnn import CNNModel, Wrapper_CNN, PB_CNN, model_CNN_3
 
-ALL_MODELS = ["lambda_resnet", "resnet", "resnet50", "CNN", "CNN3", "lambda_resnet26"]
+ALL_MODELS = ["lambda_resnet", "resnet", "resnet50", "CNN", "CNN3", "IB_CNN", "lambda_resnet26"]
 
 
 def change_num_classes(
@@ -104,6 +105,10 @@ def create_model(
         add_flatten = False
     elif base_model == "CNN3":
         model = model_CNN_3(num_channels=num_channel, num_classes=2)
+        layer_index = {"layer1": 3, "layer2": 3}
+        add_flatten = False
+    elif base_model == "IB_CNN":
+        model = Wrapper_CNN(num_channels=num_channel, num_classes=2)
         layer_index = {"layer1": 3, "layer2": 3}
         add_flatten = False
     elif base_model == "lambda_resnet_26":

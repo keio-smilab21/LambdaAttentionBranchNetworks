@@ -70,10 +70,8 @@ def create_bias_image2(image_shape: int = (1, 512, 512)):
     C, W, H = image_shape
 
     images = dataset.images.astype(np.float32)
-    print(images.shape)
 
     bias_image = np.mean(images, axis=0).astype(np.uint8)
-    print("bias_image", bias_image.shape)
     
     # save_image(bias_image[np.newaxis], "temp/bias_image.png", (0,), (1,))
     cv2.imwrite("temp/bias_image.png", bias_image)

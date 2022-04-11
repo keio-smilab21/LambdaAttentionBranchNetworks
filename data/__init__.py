@@ -12,6 +12,7 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
+from losses.ibloss import IBLoss, ib_loss
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -107,6 +108,7 @@ def get_parameter_depend_in_data_set(
     dataset_name: str,
     pos_weight: torch.Tensor = torch.Tensor([1]),
     dataset_root: str = "./datasets",
+    loss_type: str = "CE"
 ) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
@@ -130,6 +132,14 @@ def get_parameter_depend_in_data_set(
     params["mean"] = (0.485, 0.456, 0.406)
     params["std"] = (0.229, 0.224, 0.225)
 
+    if loss_type == "CE":
+        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    elif loss_type == "IB":
+        params["criterion"] = IBLoss()
+    else:
+        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    # print("criterion : ", params["criterion"])
+
     if dataset_name == "IDRiD":
         params["dataset"] = IDRiDDataset
         params["mean"] = (0.4329, 0.2094, 0.0687)
@@ -138,7 +148,6 @@ def get_parameter_depend_in_data_set(
         params["has_val"] = False
 
         params["metric"] = Accuracy()
-        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif dataset_name == "magnetogram":
         params["dataset"] = Magnetogram
         params["num_channel"] = 1
@@ -155,7 +164,6 @@ def get_parameter_depend_in_data_set(
         }
 
         params["metric"] = FlareMetric()
-        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
 
     return params
 

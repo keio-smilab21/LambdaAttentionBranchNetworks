@@ -231,7 +231,7 @@ def main(args: argparse.Namespace):
         train_ratio=args.train_ratio,
     )
     data_params = get_parameter_depend_in_data_set(
-        args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device)
+        args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device), loss_type=args.loss_type
     )
 
     # モデルの作成
@@ -493,6 +493,10 @@ def parse_args():
 
     parser.add_argument(
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
+    )
+
+    parser.add_argument(
+        "--loss_type", type=str, choices=["CE", "IB", "IB_F"], 
     )
 
     return parse_with_config(parser)
