@@ -44,6 +44,7 @@ def create_dataloader_dict(
     image_size: int = 224,
     only_test: bool = False,
     train_ratio: float = 0.9,
+    is_transform: bool = True
 ) -> Dict[str, data.DataLoader]:
     """
     データローダーの作成
@@ -83,7 +84,7 @@ def create_dataloader_dict(
         )
     else:
         train_dataset, val_dataset = create_train_val_dataset(
-            dataset_name, train_ratio, image_size
+            dataset_name, train_ratio, image_size, is_transform
         )
 
     if dataset_params["sampler"]:
@@ -174,25 +175,26 @@ def create_transform(
     image_size: int,
     params: Dict[str, Any],
     p_random_erasing: float = 0.5,
+    is_transform: bool = False
 ):
-    # if image_set == "train":
-    #     return transforms.Compose(
-    #         [
-    #             transforms.Resize((image_size, image_size)),
-    #             transforms.RandomHorizontalFlip(0.5),
-    #             transforms.RandomVerticalFlip(0.5),
-    #             transforms.RandomRotation(degrees=5),
-    #             transforms.RandomResizedCrop(
-    #                 (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
-    #             ),
-    #             transforms.ColorJitter(
-    #                 brightness=0.5, contrast=0.5, saturation=0.5, hue=0
-    #             ),
-    #             transforms.ToTensor(),
-    #             transforms.Normalize(params["mean"], params["std"]),
-    #             # transforms.RandomErasing(),
-    #         ]
-    #     )
+    if image_set == "train" and is_transform:
+        return transforms.Compose(
+            [
+                transforms.Resize((image_size, image_size)),
+                transforms.RandomHorizontalFlip(0.5),
+                transforms.RandomVerticalFlip(0.5),
+                transforms.RandomRotation(degrees=5),
+                transforms.RandomResizedCrop(
+                    (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
+                ),
+                transforms.ColorJitter(
+                    brightness=0.5, contrast=0.5, saturation=0.5, hue=0
+                ),
+                transforms.ToTensor(),
+                transforms.Normalize(params["mean"], params["std"]),
+                # transforms.RandomErasing(),
+            ]
+        )
 
     return transforms.Compose(
         [
@@ -207,9 +209,10 @@ def create_train_val_dataset(
     dataset_name: str,
     train_ratio: float,
     image_size: int = 224,
+    is_transform: bool = True
 ):
     params = get_parameter_depend_in_data_set(dataset_name)
-    train_transform = create_transform("train", image_size, params)
+    train_transform = create_transform("train", image_size, params, is_transform)
     test_transform = create_transform("test", image_size, params)
 
     trainval_dataset = params["dataset"](

@@ -263,6 +263,7 @@ def main(args: argparse.Namespace):
         args.batch_size,
         args.image_size,
         train_ratio=args.train_ratio,
+        is_transform=args.is_transform
     )
     data_params = get_parameter_depend_in_data_set(
         args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device)
@@ -543,6 +544,9 @@ def parse_args():
     parser.add_argument("--step", type=int, default=512)
     parser.add_argument(
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
+    )
+    parser.add_argument(
+        "--transform", type=bool, default=True
     )
 
     return parse_with_config(parser)
