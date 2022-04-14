@@ -64,6 +64,8 @@ class model_CNN_3(nn.Module):
 
         self.conv2 = nn.Conv2d(32, 32, kernel_size=7, stride=2, padding=3, bias=False)
         self.relu2 = nn.ReLU(inplace=True)
+        # self.conv3 = nn.Conv2d(64, 128, kernel_size=7, stride=3, padding=3, bias=False)
+        # self.relu3 = nn.ReLU(inplace=True)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
         self.fc = nn.Linear(32, num_classes)
@@ -77,6 +79,9 @@ class model_CNN_3(nn.Module):
 
         x = self.conv2(x)
         x = self.relu2(x)
+
+        # x = self.conv3(x)
+        # x = self.relu3(x)
 
         x = self.avgpool(x)
         x = self.flatten(x)

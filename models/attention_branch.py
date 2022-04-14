@@ -223,6 +223,7 @@ class AttentionBranchModel(nn.Module):
         self.theta_attention = theta_attention
 
     def forward(self, x):
+        # (8, 1, 512, 512)
         x = self.feature_extractor(x)
 
         # For Attention Loss

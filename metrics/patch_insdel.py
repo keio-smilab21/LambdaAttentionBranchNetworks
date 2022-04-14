@@ -97,7 +97,9 @@ class PatchInsertionDeletion(Metric):
 
         self.patch_attention = skimage.measure.block_reduce(
             self.attention, (self.patch_size, self.patch_size), np.max
-        )
+        ) # (32, 32) = (512/patch_size, 512/patch_size)
+        # print("aaaaattention : ", self.attention.shape) -> (512. 512)
+        # print("self.patch_size : ", self.patch_size) -> (16)
 
     def calculate_attention_order(self):
         attention_flat = np.ravel(self.patch_attention)
@@ -108,7 +110,7 @@ class PatchInsertionDeletion(Metric):
         patch_w, _ = W // self.patch_size, H // self.patch_size
         self.order = np.apply_along_axis(
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
-        )
+        ) # (2, 1024)
 
     def generate_insdel_images(self, mode: str, mask_mode: str="black"):
         C, W, H = self.image.shape
@@ -122,6 +124,7 @@ class PatchInsertionDeletion(Metric):
 
         for i in range(num_insertion):
             # self.order.shape[1] = (2, N)
+            # print("self.order.shape : ", self.order.shape) (2, 262144)
             step_index = min(self.step * (i + 1), self.order.shape[1] - 1)
             w_indices = self.order[0, step_index]
             h_indices = self.order[1, step_index]

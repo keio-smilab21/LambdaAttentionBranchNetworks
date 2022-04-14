@@ -1,4 +1,5 @@
 import random
+from turtle import pos
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -12,6 +13,8 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
+from losses.MaskBCE import MaskBCE
+from losses.MaskKL import MaskKL
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -105,6 +108,7 @@ def create_dataloader_dict(
 
 def get_parameter_depend_in_data_set(
     dataset_name: str,
+    loss_type: str="singleBCE",
     pos_weight: torch.Tensor = torch.Tensor([1]),
     dataset_root: str = "./datasets",
 ) -> Dict[str, Any]:
@@ -138,7 +142,6 @@ def get_parameter_depend_in_data_set(
         params["has_val"] = False
 
         params["metric"] = Accuracy()
-        params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif dataset_name == "magnetogram":
         params["dataset"] = Magnetogram
         params["num_channel"] = 1
@@ -155,7 +158,13 @@ def get_parameter_depend_in_data_set(
         }
 
         params["metric"] = FlareMetric()
+    
+    if loss_type == "singleBCE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    elif loss_type == "MaskBCE":
+        params["criterion"] = MaskBCE(pos_weight=pos_weight)
+    elif loss_type == "MaskKL":
+        params["criterion"] = MaskKL(pos_weight=pos_weight)
 
     return params
 
@@ -166,24 +175,24 @@ def create_transform(
     params: Dict[str, Any],
     p_random_erasing: float = 0.5,
 ):
-    if image_set == "train":
-        return transforms.Compose(
-            [
-                transforms.Resize((image_size, image_size)),
-                transforms.RandomHorizontalFlip(0.5),
-                transforms.RandomVerticalFlip(0.5),
-                transforms.RandomRotation(degrees=5),
-                transforms.RandomResizedCrop(
-                    (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
-                ),
-                transforms.ColorJitter(
-                    brightness=0.5, contrast=0.5, saturation=0.5, hue=0
-                ),
-                transforms.ToTensor(),
-                transforms.Normalize(params["mean"], params["std"]),
-                # transforms.RandomErasing(),
-            ]
-        )
+    # if image_set == "train":
+    #     return transforms.Compose(
+    #         [
+    #             transforms.Resize((image_size, image_size)),
+    #             transforms.RandomHorizontalFlip(0.5),
+    #             transforms.RandomVerticalFlip(0.5),
+    #             transforms.RandomRotation(degrees=5),
+    #             transforms.RandomResizedCrop(
+    #                 (image_size, image_size), scale=(0.7, 1.3), ratio=(3 / 4, 4 / 3)
+    #             ),
+    #             transforms.ColorJitter(
+    #                 brightness=0.5, contrast=0.5, saturation=0.5, hue=0
+    #             ),
+    #             transforms.ToTensor(),
+    #             transforms.Normalize(params["mean"], params["std"]),
+    #             # transforms.RandomErasing(),
+    #         ]
+    #     )
 
     return transforms.Compose(
         [

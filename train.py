@@ -1,9 +1,10 @@
 import argparse
 import datetime
 import os
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -22,9 +23,11 @@ from models.attention_branch import Bottleneck as ABNBottleneck
 from models.lambda_resnet import Bottleneck as LambdaBottleneck
 from optim import ALL_OPTIM, create_optimizer
 from optim.sam import SAM
-from utils.loss import calculate_loss
+from utils.loss import calculate_loss, criterion_with_cast_targets
 from utils.utils import fix_seed, module_generator, parse_with_config, save_json
 from utils.visualize import save_attention_map
+from utils.mask_generator import Mask_Generator
+from visualize import calculate_attention
 
 
 class EarlyStopping:
@@ -181,11 +184,20 @@ def wandb_log(loss: float, metrics: Metric, phase: str) -> None:
 
 def train(
     dataloader: data.DataLoader,
+    dataset: data.Dataset,
     model: nn.Module,
     criterion: nn.modules.loss._Loss,
     optimizer: optim.Optimizer,
     metric: Metric,
+    params: Dict[str, Any],
+    patch_size: int,
+    step: int,
+    mask_mode: str = "base",
+    attention_dir: Optional[str] = None,
     lambdas: Optional[Dict[str, float]] = None,
+    loss_type: str = "singleBCE",
+    method: str = "ABN",
+    
 ) -> Tuple[float, Metric]:
     total = 0
     total_loss: float = 0
@@ -193,11 +205,33 @@ def train(
 
     model.train()
     for data in tqdm(dataloader, desc="Train: "):
-        inputs, labels = data[0].to(device), data[1].to(device)
+        # OK
+        inputs, labels = data[0].to(device), data[1].to(device) # iputs ; (32, 1, 512, 512), labels: (32)
         optimizer.zero_grad()
         outputs = model(inputs)
 
-        loss = calculate_loss(criterion, outputs, labels, model, lambdas)
+        # lossの定義 -> ここを変更??
+        if loss_type == "singleBCE":
+            loss = calculate_loss(criterion, outputs, labels, model, lambdas)
+
+        else:
+            mask_gen = Mask_Generator(model, params, inputs, labels, "ABN",
+                                      patch_size, step, dataset, device, mask_mode, attention_dir)
+            mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
+            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+            mask_outputs = model(mask_inputs)
+
+            if loss_type == "MaskBCE":
+                loss_orig = criterion("origin", outputs, labels, model, lambdas)
+                loss_mask_BCE = criterion("MaskBCE",  mask_outputs, labels)
+                loss = loss_orig + loss_mask_BCE
+
+            elif loss_type == "MaskKL":
+                loss_orig = criterion("origin", outputs, labels, model, lambdas)
+                loss_mask_BCE = criterion("MaskBCE", mask_outputs, labels)
+                loss_KL = criterion("KL", mask_outputs, outputs)
+                loss = loss_orig + loss_mask_BCE + loss_KL
+
         loss.backward()
         total_loss += loss.item()
         metric.evaluate(outputs, labels)
@@ -231,7 +265,7 @@ def main(args: argparse.Namespace):
         train_ratio=args.train_ratio,
     )
     data_params = get_parameter_depend_in_data_set(
-        args.dataset, pos_weight=torch.Tensor(args.loss_weights).to(device)
+        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device)
     )
 
     # モデルの作成
@@ -270,7 +304,7 @@ def main(args: argparse.Namespace):
         verbose=True,
     )
 
-    criterion = data_params["criterion"]
+    criterion = data_params["criterion"] # 損失関数の定義
     metric = data_params["metric"]
 
     # run_name の 作成 (for save_dir / wandb)
@@ -317,11 +351,18 @@ def main(args: argparse.Namespace):
             if phase == "Train":
                 loss, metric = train(
                     dataloader,
+                    args.dataset,
                     model,
                     criterion,
                     optimizer,
                     metric,
+                    data_params,
+                    args.patch_size,
+                    args.step,
+                    args.mask_mode,
+                    args.attention_dir,
                     lambdas=lambdas,
+                    loss_type=args.loss_type
                 )
             else:
                 loss, metric = test(
@@ -493,6 +534,15 @@ def parse_args():
 
     parser.add_argument(
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
+    )
+    parser.add_argument(
+        "--loss_type", type=str, choices=["singleBCE", "MaskBCE", "MaskKL"], default="singleBCE"
+    )
+    parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
+    parser.add_argument("--patch_size", type=int, default=1)
+    parser.add_argument("--step", type=int, default=512)
+    parser.add_argument(
+        "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )
 
     return parse_with_config(parser)
