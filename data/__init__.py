@@ -13,8 +13,7 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
-from losses.MaskBCE import MaskBCE
-from losses.MaskKL import MaskKL
+from losses.losses import DoubleBCE, BCEWithKL, MaskKL
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -160,10 +159,10 @@ def get_parameter_depend_in_data_set(
 
         params["metric"] = FlareMetric()
     
-    if loss_type == "singleBCE":
+    if loss_type == "SingleBCE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    elif loss_type == "MaskBCE":
-        params["criterion"] = MaskBCE(pos_weight=pos_weight)
+    elif loss_type == "DoubleBCE":
+        params["criterion"] = DoubleBCE(pos_weight=pos_weight)
     elif loss_type == "MaskKL":
         params["criterion"] = MaskKL(pos_weight=pos_weight)
 

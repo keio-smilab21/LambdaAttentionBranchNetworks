@@ -30,6 +30,9 @@ def criterion_with_cast_targets(
     if isinstance(criterion, nn.BCEWithLogitsLoss):
         targets = F.one_hot(targets, num_classes=2)
         targets = targets.to(preds.dtype)
+    
+    if isinstance(criterion, nn.KLDivLoss):
+        targets = targets.to(preds.dtype)
 
     return criterion(preds, targets)
 

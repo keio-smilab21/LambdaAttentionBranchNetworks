@@ -537,7 +537,7 @@ def parse_args():
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
     )
     parser.add_argument(
-        "--loss_type", type=str, choices=["singleBCE", "MaskBCE", "MaskKL"], default="singleBCE"
+        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "MaskKL"], default="SingleBCE"
     )
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--patch_size", type=int, default=1)
