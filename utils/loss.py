@@ -32,6 +32,7 @@ def criterion_with_cast_targets(
         targets = targets.to(preds.dtype)
     
     if isinstance(criterion, nn.KLDivLoss):
+        targets = F.one_hot(targets, num_classes=2) # targets : (32) -> (32, 2)
         targets = targets.to(preds.dtype)
 
     return criterion(preds, targets)

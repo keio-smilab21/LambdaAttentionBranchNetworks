@@ -214,23 +214,15 @@ def train(
         if loss_type == "singleBCE":
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
-        else:
+        elif loss_type == "BCEWithKL":
+            # create mask Input and outputs
             mask_gen = Mask_Generator(model, params, inputs, labels, "ABN",
                                       patch_size, step, dataset, device, mask_mode, attention_dir)
             mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            if loss_type == "MaskBCE":
-                loss_orig = criterion("origin", outputs, labels, model, lambdas)
-                loss_mask_BCE = criterion("MaskBCE",  mask_outputs, labels)
-                loss = loss_orig + loss_mask_BCE
-
-            elif loss_type == "MaskKL":
-                loss_orig = criterion("origin", outputs, labels, model, lambdas)
-                loss_mask_BCE = criterion("MaskBCE", mask_outputs, labels)
-                loss_KL = criterion("KL", mask_outputs, outputs)
-                loss = loss_orig + loss_mask_BCE + loss_KL
+            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
 
         loss.backward()
         total_loss += loss.item()
@@ -537,7 +529,7 @@ def parse_args():
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
     )
     parser.add_argument(
-        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "MaskKL"], default="SingleBCE"
+        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "BCEWithKL", "MaskKL"], default="SingleBCE"
     )
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--patch_size", type=int, default=1)
@@ -546,7 +538,7 @@ def parse_args():
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )
     parser.add_argument(
-        "--transform", type=bool, default=True
+        "--is_transform", type=bool, default=True
     )
 
     return parse_with_config(parser)
