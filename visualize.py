@@ -99,7 +99,7 @@ def visualize(
 
     model.eval()
     for i, data in enumerate(tqdm(dataloader, desc=f"Visualizing: ")):
-        inputs, labels = data[0].to(device), data[1].to(device)
+        inputs, labels = data[0].to(device), data[1].to(device) # inputs : (1, 1, 512, 512)
         image = inputs[0].cpu().numpy()
         label = labels[0]
 
@@ -114,7 +114,7 @@ def visualize(
 
         attention = calculate_attention(
             model, inputs, label, method, params, attention_fname
-        )
+        ) # (1, 228, 228)
         if attention is None:
             continue
         if method == "RISE":

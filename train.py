@@ -205,17 +205,14 @@ def train(
 
     model.train()
     for data in tqdm(dataloader, desc="Train: "):
-        # OK
         inputs, labels = data[0].to(device), data[1].to(device) # iputs ; (32, 1, 512, 512), labels: (32)
         optimizer.zero_grad()
         outputs = model(inputs)
 
-        # lossの定義 -> ここを変更??
-        if loss_type == "singleBCE":
+        if loss_type == "SingleBCE":
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         elif loss_type == "BCEWithKL":
-            # create mask Input and outputs
             mask_gen = Mask_Generator(model, params, inputs, labels, "ABN",
                                       patch_size, step, dataset, device, mask_mode, attention_dir)
             mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
@@ -365,7 +362,13 @@ def main(args: argparse.Namespace):
                     metric,
                     device,
                     phase,
-                    lambdas=lambdas,
+                    lambdas,
+                    args.step,
+                    args.dataset,
+                    data_params,
+                    args.patch_size,
+                    args.mask_mode,
+                    loss_type = args.loss_type,
                 )
 
             metric_log = metric.log() # acc 

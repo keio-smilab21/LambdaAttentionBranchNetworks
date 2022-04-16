@@ -33,7 +33,7 @@ class BCEWithKL(nn.Module):
     
     def forward(self, outputs, outputs_KL, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
-        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_KL, targets)
+        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_KL, outputs)
 
         return self.loss_BCE + self.alpha * self.loss_KL
 
