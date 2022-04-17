@@ -45,37 +45,7 @@ class Mask_Generator():
         self.dataset = dataset
         self.mask_mode = mask_mode
         self.attention_dir = attention_dir
-    
-    def create_mask_inputs_temp(self):
-        images = self.images.cpu().numpy() # (32, 1, 512, 512)
-        self.mask_inputs = np.zeros(shape=images.shape) # (32, 1, 512, 512)
-        # self.attentions = [] # len : B batch_size
-        self.patch_attentions = [] # len : B
-        self.orders = [] # len B
-            
-        # attentionの値の計算
-        # attention : (512, 512)(通常) -> (32, 1, 128, 128)(複数版)
-        attentions = self.model.attention_branch.attention  # (1, H, W) -> (32, 1, 128, 128)
-        attentions: np.ndarray = attentions.cpu().detach().numpy()
 
-        # self.images (32, 1, 512 ,512) , attentions (32, 1, 128, 128) 
-        if not (images.shape[2:] == attentions.shape[2:]):
-            attentions = cv2.resize(
-                attentions[2:], dsize=(images.shape[2], images.shape[3])
-            )
-
-        # attentionをパッチにしてパッチごとの順位を計算
-        # patch_attentions = self.divide_attentions_map_into_patch(attentions) # (512, 512)(通常) -> (32, 1, 56, 56)
-        patch_attentions = attentions
-        orders = self.calculate_attention_orders(attentions, patch_attentions) # (2, 262144)(通常) -> 
-
-        # mask_inputを作成して返す
-        mask_inputs = self.create_mask_image(self.images.cpu().numpy(), attentions, patch_attentions, orders, mask_mode=self.mask_mode)
-        
-
-        # (64, 1, 512, 512)
-        return mask_inputs
-    
     def create_mask_inputs(self):
         mask_inputs = np.zeros(shape=self.images.shape) # (64, 1, 512, 512)
         attentions = [] # len : 64
@@ -86,15 +56,10 @@ class Mask_Generator():
             label = self.labels[i]
             input = self.images[i] # (1, 512, 512)
             input = torch.unsqueeze(input, 0) # (1, 1, 512, 512)
-
-            base_fname = f"{i+1}_{self.params['classes'][label]}"
-            attention_fname = None
-            if self.attention_dir is not None:
-                attention_fname = os.path.join(self.attention_dir, f"{base_fname}.npy")
                 
             # attentionの値の計算
             # attention : (512, 512)
-            attention = calculate_attention(self.model, input, label, self.method, self.params, attention_fname)
+            attention = calculate_attention(self.model, input, i)
             if not (self.images[i].shape[1:] == attention.shape):
                 attention = cv2.resize(
                     attention[0], dsize=(self.images[i].shape[1], self.images[i].shape[2])
@@ -107,7 +72,8 @@ class Mask_Generator():
             orders.append(self.calculate_attention_order(attentions[i], patch_attentions[i])) # (2, 262144)
 
             # mask_inputを作成して返す
-            mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], patch_attentions[i], orders[i], mask_mode=self.mask_mode)
+            save_mask_image = True if i % 10 == 0 else False
+            mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], patch_attentions[i], orders[i], mask_mode=self.mask_mode, save_mask_image=save_mask_image)
             mask_inputs[i] = mask_input
 
         # (64, 1, 512, 512)
@@ -122,20 +88,6 @@ class Mask_Generator():
         ) # (32, 32) = (512/patch_size, 512/patch_size)
         # print("aaaaattention : ", self.attention.shape) -> (512. 512)
         # print("self.patch_size : ", self.patch_size) -> (16)
-    
-
-    def divide_attentions_map_into_patch(self, attentions):
-        """
-        attentionをpatch単位に分割する
-        """
-        assert attentions is not None
-        # print("self.patch_size", self.patch_size) -> 1
-        # print("aaaatenion : ", attention.shape) -> (512, 512)
-
-        return skimage.measure.block_reduce(
-            attentions, (1, self.patch_size, self.patch_size), np.max
-        )
-
 
     def calculate_attention_order(self, attention, patch_attention):
         """
@@ -151,35 +103,15 @@ class Mask_Generator():
         return np.apply_along_axis(
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
         )
-    
-    def calculate_attention_orders(self, attentions, patch_attentions):
-        """
-        attentionの順番を計算する
-        昇順のままでいいので、-消していることに注意
-        """
-        B, C = patch_attentions.shape[0], patch_attentions.shape[1]
-        attention_flat = patch_attentions.reshape((B, C, -1))
-        print("attentionssssssssssssssssssflat : ", attention_flat.shape)
-        # 昇順でいいのでそのまま
-        orders = np.argsort(attention_flat, axis=2)
-        print("order after sort  :", orders.shape)
 
-        W, H = attentions.shape
-        patch_w, _ = W // self.patch_size, H // self.patch_size
-        return np.apply_along_axis(
-            lambda x: map_2d_indices(x, patch_w), axis=0, arr=orders
-        )
-
-
-    def create_mask_image(self, image, attention, patch_attention, attention_order, mask_mode: str="base"):
-        ratio = 0.8
+    def create_mask_image(self, image, attention, patch_attention, attention_order, mask_mode: str="base", save_mask_image: bool = False):
+        ratio = 0.5
         
         # TODO ここってなにやってるん
         if not (image.shape[1:] == attention.shape):
             attention = cv2.resize(
                 attention[0], dsize=(image.shape[1], image.shape[2])
             )
-
         C, W, H = image.shape # (1, 512, 512)
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
@@ -190,6 +122,8 @@ class Mask_Generator():
 
         # ここからした実験 : num_insertionの半分にしてる
         # print("self.orders : ", self.orders[i].shape) (2, 262144)
+        # num_insertion : 98 , int(num_insertion * ratio + 1) : 79
+        print("step_index : ", min(self.step * (int(num_insertion*ratio + 1)), attention_order.shape[1] - 1))
         step_index = min(self.step * (int(num_insertion*ratio + 1)), attention_order.shape[1] - 1)
         w_indices = attention_order[0, step_index]
         h_indices = attention_order[1, step_index]
@@ -233,19 +167,20 @@ class Mask_Generator():
                     mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
 
 
-        # # mask 画像の保存
-        # # print("mask_image.shape : ", mask_img.shape) #(1, 512, 512)
-        # img = mask_img.reshape(H, W)
-        # # img = image.reshape(512, 512)
-        # fig, ax = plt.subplots()
-        # if img.shape[-1] == 1:
-        #     im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
-        # else:
-        #     im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
-        # fig.colorbar(im)
-        # plt.savefig(f"mask_image/{mode}/self.input.png")
-        # plt.clf()
-        # plt.close()
+        # mask 画像の保存
+        if save_mask_image:
+            # print("mask_image.shape : ", mask_img.shape) #(1, 512, 512)
+            img = mask_img.reshape(H, W)
+            # img = image.reshape(512, 512)
+            fig, ax = plt.subplots()
+            if img.shape[-1] == 1:
+                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+            else:
+                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+            fig.colorbar(im)
+            plt.savefig(f"mask_image/deletion/self.input.png")
+            plt.clf()
+            plt.close()
 
         return mask_img # (1, 512, 512)
 
@@ -275,71 +210,16 @@ def map_2d_indices(indices_1d: int, width: int):
 
 def calculate_attention(
     model: nn.Module,
-    image: torch.Tensor,
-    label: torch.Tensor,
-    method: str,
-    rise_params: Optional[Dict[str, Any]],
-    fname: Optional[str],
-) -> Tuple[np.ndarray, bool]:
-
-    if method == "ABN":
-        assert isinstance(model, AttentionBranchModel)
-        y = model(image) # image : (1, 1, 512, 512)
-        attentions = model.attention_branch.attention  # (1, W, W)
-        attention = attentions[0]
-        attention: np.ndarray = attention.cpu().detach().numpy()
-        # TODO ここにもともとはdetachないのに今回加えなければならないのはどゆこと
-
-    elif method == "RISE":
-        assert rise_params is not None
-        rise_model = RISE(
-            model,
-            n_masks=rise_params["n_masks"],
-            p1=rise_params["p1"],
-            input_size=rise_params["input_size"],
-            initial_mask_size=rise_params["initial_mask_size"],
-            n_batch=rise_params["n_batch"],
-            mask_path=rise_params["mask_path"],
-        )
-        attentions = rise_model(image)  # (N_class, W, H)
-        attention = attentions[label]
-        attention: np.ndarray = attention.cpu().numpy()
-
-    elif method == "npy":
-        assert fname is not None
-        attention: np.ndarray = np.load(fname)
-
-    elif method == "lambda":
-        _ = model(image)
-        num_bt = 0
-        for module in module_generator(model):
-            if isinstance(module, Bottleneck):
-                num_bt += 1
-                if 2 == num_bt:
-                    attention = module.yc
-                    attention = (attention - attention.min()) / (
-                        attention.max() - attention.min()
-                    )
-                    break
-        attention = attention.cpu().numpy()
-
-    else:
-        raise ValueError
-    
-    # (1, 128, 128)
-    return attention
-
-def calculate_attentions(
-    model: nn.Module,
-    images: torch.Tensor,
+    image: torch.Tensor, # (1, 1, 512, 512)
+    idx: int
 ) -> Tuple[np.ndarray, bool]:
 
     assert isinstance(model, AttentionBranchModel)
-    y = model(images) # image : (32, 1, 512, 512)
-    attentions = model.attention_branch.attention  # (1, H, W) -> (32, 1, 128, 128)
-    # attentions = attentions[0]
-    attentions: np.ndarray = attentions.cpu().detach().numpy()
+    # y = model(image) # image : (1, 1, 512, 512)
+    attentions = model.attention_branch.attention  # (32, 1, 512, 512)
+    attention = attentions[idx]
+    attention: np.ndarray = attention.cpu().detach().numpy()
     # TODO ここにもともとはdetachないのに今回加えなければならないのはどゆこと
-    
-    # (1, 128, 128) -> (32, 1, 128, 128)
-    return attentions
+
+    # (1, 128, 128)
+    return attention

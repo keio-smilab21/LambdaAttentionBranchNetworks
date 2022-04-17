@@ -219,10 +219,10 @@ def train(
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
+            loss = criterion(outputs, mask_outputs, labels, model, lambdas) #  loss_KL : 47391.XXXX
 
         loss.backward()
-        total_loss += loss.item()
+        total_loss += loss.item() # loss.item() : 47295.XXXX
         metric.evaluate(outputs, labels)
 
         # OptimizerがSAMのとき2回backwardする
@@ -536,7 +536,7 @@ def parse_args():
     )
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--patch_size", type=int, default=1)
-    parser.add_argument("--step", type=int, default=512)
+    parser.add_argument("--step", type=int, default=10000)
     parser.add_argument(
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )

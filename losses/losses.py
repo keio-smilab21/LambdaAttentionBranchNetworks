@@ -5,6 +5,20 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils.loss import calculate_loss, criterion_with_cast_targets
 
+class SingleBCE(nn.Module):
+    def __init__(self, pos_weight):
+        super(SingleBCE, self).__init__()
+
+        self.pos_weight = pos_weight
+        self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        self.data_num = 0
+    
+    def forward(self, outputs, targets, model=None, lambdas=None):
+        self.data_num = targets.size()[0]
+        self.loss = calculate_loss(self.BCE, outputs, targets, model, lambdas)
+
+
+        return self.loss
 class DoubleBCE(nn.Module):
     def __init__(self, pos_weight, alpha=1.0):
         super(DoubleBCE, self).__init__()
