@@ -17,8 +17,8 @@ class SingleBCE(nn.Module):
         self.data_num = targets.size()[0]
         self.loss = calculate_loss(self.BCE, outputs, targets, model, lambdas)
 
-
         return self.loss
+
 class DoubleBCE(nn.Module):
     def __init__(self, pos_weight, alpha=1.0):
         super(DoubleBCE, self).__init__()

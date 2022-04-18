@@ -75,28 +75,43 @@ class Mask_Generator():
             save_mask_image = True if i % 10 == 0 else False
             mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], patch_attentions[i], orders[i], mask_mode=self.mask_mode, save_mask_image=save_mask_image)
             mask_inputs[i] = mask_input
+        
+        if i == 30:
+            # # mask 画像の保存
+            # print("mask_image.shape : ", mask_img.shape) #(1, 512, 512)
+            img = mask_input.reshape(self.images.shape[2], self.images.shape[3])
+            # img = image.reshape(512, 512)
+            fig, ax = plt.subplots()
+            if img.shape[-1] == 1:
+                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+            else:
+                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+            fig.colorbar(im)
+            plt.savefig(f"mask_image/deletion/self.input.png")
+            plt.clf()
+            plt.close()
 
         # (64, 1, 512, 512)
         return mask_inputs
 
-    
+
     def divide_attention_map_into_patch(self, attention):
         assert attention is not None
 
         self.patch_attention = skimage.measure.block_reduce(
             attention, (self.patch_size, self.patch_size), np.max
         ) # (32, 32) = (512/patch_size, 512/patch_size)
-        # print("aaaaattention : ", self.attention.shape) -> (512. 512)
-        # print("self.patch_size : ", self.patch_size) -> (16)
+
 
     def calculate_attention_order(self, attention, patch_attention):
         """
         attentionの順番を計算する
-        昇順のままでいいので、-消していることに注意
+        昇順のままでいいので、-消していることに注意 -> やめた
+        降順のままにしてdeletionとinsertionを逆にすればいいかな
         """
         attention_flat = np.ravel(patch_attention)
         # 昇順でいいのでそのまま
-        order = np.argsort(attention_flat)
+        order = np.argsort(-attention_flat)
 
         W, H = attention.shape
         patch_w, _ = W // self.patch_size, H // self.patch_size
@@ -104,8 +119,9 @@ class Mask_Generator():
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
         )
 
+
     def create_mask_image(self, image, attention, patch_attention, attention_order, mask_mode: str="base", save_mask_image: bool = False):
-        ratio = 0.5
+        ratio = 0.1
         
         # TODO ここってなにやってるん
         if not (image.shape[1:] == attention.shape):
@@ -114,21 +130,18 @@ class Mask_Generator():
             )
         C, W, H = image.shape # (1, 512, 512)
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
-        num_insertion = math.ceil(patch_w * patch_h / self.step)
+        num_insertion = math.ceil(patch_w * patch_h / self.step) # num_insertion : 27 when img_size512, step 10000
 
         params = get_parameter_depend_in_data_set(self.dataset)
         mean, std = params["mean"], params["std"]
         image = reverse_normalize(image.copy(), mean, std)
 
         # ここからした実験 : num_insertionの半分にしてる
-        # print("self.orders : ", self.orders[i].shape) (2, 262144)
-        # num_insertion : 98 , int(num_insertion * ratio + 1) : 79
-        print("step_index : ", min(self.step * (int(num_insertion*ratio + 1)), attention_order.shape[1] - 1))
-        step_index = min(self.step * (int(num_insertion*ratio + 1)), attention_order.shape[1] - 1)
+        step_index = min(self.step * (int(num_insertion*ratio + 1)), attention_order.shape[1] - 1) # 220000
         w_indices = attention_order[0, step_index]
         h_indices = attention_order[1, step_index]
         threthold = patch_attention[w_indices, h_indices]
-        
+
         mask_img = np.zeros(shape=image.shape) # (1, 512, 512)
 
         if mask_mode in ["blur", "base"]:
@@ -146,8 +159,8 @@ class Mask_Generator():
             if len(base_mask_image.shape) == 2:
                 base_mask_image = base_mask_image.reshape(C, H, W)
 
-            mask_src = np.where(threthold <= patch_attention, 0.0, 1.0)
-            mask_base = np.where(threthold <= patch_attention, 1.0, 0.0)
+            mask_src = np.where(threthold <= patch_attention, 1.0, 0.0)
+            mask_base = np.where(threthold <= patch_attention, 0.0, 1.0)
             
             mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
             mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
@@ -157,7 +170,7 @@ class Mask_Generator():
                 mask_img[c] = (mask_img[c] - mean[c]) / std[c]
             
         else:
-            mask = np.where(threthold <= patch_attention, 0.0, 1.0)
+            mask = np.where(threthold <= patch_attention, 1.0, 0.0)
             mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
             for c in range(C):
@@ -167,20 +180,20 @@ class Mask_Generator():
                     mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
 
 
-        # mask 画像の保存
-        if save_mask_image:
-            # print("mask_image.shape : ", mask_img.shape) #(1, 512, 512)
-            img = mask_img.reshape(H, W)
-            # img = image.reshape(512, 512)
-            fig, ax = plt.subplots()
-            if img.shape[-1] == 1:
-                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
-            else:
-                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
-            fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/self.input.png")
-            plt.clf()
-            plt.close()
+        # # mask 画像の保存
+        # if save_mask_image:
+        #     # print("mask_image.shape : ", mask_img.shape) #(1, 512, 512)
+        #     img = mask_img.reshape(H, W)
+        #     # img = image.reshape(512, 512)
+        #     fig, ax = plt.subplots()
+        #     if img.shape[-1] == 1:
+        #         im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+        #     else:
+        #         im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+        #     fig.colorbar(im)
+        #     plt.savefig(f"mask_image/deletion/self.input.png")
+        #     plt.clf()
+        #     plt.close()
 
         return mask_img # (1, 512, 512)
 
@@ -218,7 +231,7 @@ def calculate_attention(
     # y = model(image) # image : (1, 1, 512, 512)
     attentions = model.attention_branch.attention  # (32, 1, 512, 512)
     attention = attentions[idx]
-    attention: np.ndarray = attention.cpu().detach().numpy()
+    attention: np.ndarray = attention.cpu().clone().detach().numpy()
     # TODO ここにもともとはdetachないのに今回加えなければならないのはどゆこと
 
     # (1, 128, 128)

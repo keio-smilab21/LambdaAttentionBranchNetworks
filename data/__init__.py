@@ -164,7 +164,7 @@ def get_parameter_depend_in_data_set(
     elif loss_type == "DoubleBCE":
         params["criterion"] = DoubleBCE(pos_weight=pos_weight)
     elif loss_type == "BCEWithKL":
-        params["criterion"] = BCEWithKL(pos_weight=pos_weight)
+        params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=0.5)
     elif loss_type == "MaskKL":
         params["criterion"] = MaskKL(pos_weight=pos_weight)
 

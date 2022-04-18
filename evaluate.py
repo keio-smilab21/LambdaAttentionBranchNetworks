@@ -50,12 +50,11 @@ def test(
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            total_loss += criterion(outputs, mask_outputs, labels, model, lambdas)
+            total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
 
         metrics.evaluate(outputs, labels)
         total += labels.size(0)
     
-
     test_loss = total_loss / total
     return test_loss, metrics
 
