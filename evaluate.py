@@ -28,11 +28,10 @@ def test(
     lambdas: Optional[Dict[str, float]] = None,
     step: int = 1,
     dataset: data.Dataset = None,
-    params: Dict[str, Any] = None,
     patch_size: int = None,
     mask_mode: str = "base",
-    attention_dir: Optional[str] = None,
-    loss_type: str = "SingleBCE"
+    loss_type: str = "SingleBCE",
+    ratio_src_image: float = 0.1,
 ) -> Tuple[float, Metric]:
     total = 0
     total_loss: float = 0
@@ -44,8 +43,8 @@ def test(
         if loss_type == "SingleBCE":
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
         elif loss_type == "BCEWithKL":
-            mask_gen = Mask_Generator(model, params, inputs, labels, "ABN",
-                                      patch_size, step, dataset, device, mask_mode, attention_dir)
+            mask_gen = Mask_Generator(model, inputs,
+                                      patch_size, step, dataset, mask_mode, ratio_src_image)
             mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)

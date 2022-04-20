@@ -1,7 +1,7 @@
 import argparse
 import datetime
 import os
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Dict, Iterable, Optional, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,11 +23,10 @@ from models.attention_branch import Bottleneck as ABNBottleneck
 from models.lambda_resnet import Bottleneck as LambdaBottleneck
 from optim import ALL_OPTIM, create_optimizer
 from optim.sam import SAM
-from utils.loss import calculate_loss, criterion_with_cast_targets
+from utils.loss import calculate_loss
 from utils.utils import fix_seed, module_generator, parse_with_config, save_json
 from utils.visualize import save_attention_map
 from utils.mask_generator import Mask_Generator
-from visualize import calculate_attention
 
 
 class EarlyStopping:
@@ -189,14 +188,13 @@ def train(
     criterion: nn.modules.loss._Loss,
     optimizer: optim.Optimizer,
     metric: Metric,
-    params: Dict[str, Any],
     patch_size: int,
     step: int,
     mask_mode: str = "base",
-    attention_dir: Optional[str] = None,
     lambdas: Optional[Dict[str, float]] = None,
     loss_type: str = "singleBCE",
-    method: str = "ABN",
+    ratio_src_image: float = 0.1,
+    save_mask_image: bool = False,
     
 ) -> Tuple[float, Metric]:
     total = 0
@@ -213,16 +211,16 @@ def train(
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         elif loss_type == "BCEWithKL":
-            mask_gen = Mask_Generator(model, params, inputs, labels, "ABN",
-                                      patch_size, step, dataset, device, mask_mode, attention_dir)
-            mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
+            mask_gen = Mask_Generator(model, inputs,
+                                      patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            loss = criterion(outputs, mask_outputs, labels, model, lambdas) #  loss_KL : 47391.XXXX
+            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
 
         loss.backward()
-        total_loss += loss.item() # loss.item() : 47295.XXXX
+        total_loss += loss.item()
         metric.evaluate(outputs, labels)
 
         # OptimizerがSAMのとき2回backwardする
@@ -255,7 +253,7 @@ def main(args: argparse.Namespace):
         is_transform=args.is_transform
     )
     data_params = get_parameter_depend_in_data_set(
-        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device)
+        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), alpha=args.ratio_KL
     )
 
     # モデルの作成
@@ -346,13 +344,13 @@ def main(args: argparse.Namespace):
                     criterion,
                     optimizer,
                     metric,
-                    data_params,
                     args.patch_size,
                     args.step,
                     args.mask_mode,
-                    args.attention_dir,
                     lambdas=lambdas,
-                    loss_type=args.loss_type
+                    loss_type=args.loss_type,
+                    ratio_src_image=args.ratio_src_image,
+                    save_mask_image=args.save_mask_image,
                 )
             else:
                 loss, metric = test(
@@ -365,10 +363,10 @@ def main(args: argparse.Namespace):
                     lambdas,
                     args.step,
                     args.dataset,
-                    data_params,
                     args.patch_size,
                     args.mask_mode,
                     loss_type = args.loss_type,
+                    ratio_src_image = args.ratio_src_image,
                 )
 
             metric_log = metric.log() # acc 
@@ -542,6 +540,15 @@ def parse_args():
     )
     parser.add_argument(
         "--is_transform", type=bool, default=True
+    )
+    parser.add_argument(
+        "--ratio_src_image", type=float, default=0.1
+    )
+    parser.add_argument(
+        "--ratio_KL", type=float, default=0.5
+    )
+    parser.add_argument(
+        "--save_mask_image", type=bool, default=False
     )
 
     return parse_with_config(parser)

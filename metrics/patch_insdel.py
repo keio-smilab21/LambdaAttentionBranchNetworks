@@ -110,7 +110,7 @@ class PatchInsertionDeletion(Metric):
         patch_w, _ = W // self.patch_size, H // self.patch_size
         self.order = np.apply_along_axis(
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
-        ) # (2, 1024)
+        )
 
     def generate_insdel_images(self, mode: str, mask_mode: str="black"):
         C, W, H = self.image.shape

@@ -111,6 +111,7 @@ def get_parameter_depend_in_data_set(
     loss_type: str="singleBCE",
     pos_weight: torch.Tensor = torch.Tensor([1]),
     dataset_root: str = "./datasets",
+    alpha: float = 0.5,
 ) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
@@ -164,7 +165,7 @@ def get_parameter_depend_in_data_set(
     elif loss_type == "DoubleBCE":
         params["criterion"] = DoubleBCE(pos_weight=pos_weight)
     elif loss_type == "BCEWithKL":
-        params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=0.5)
+        params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=alpha)
     elif loss_type == "MaskKL":
         params["criterion"] = MaskKL(pos_weight=pos_weight)
 
