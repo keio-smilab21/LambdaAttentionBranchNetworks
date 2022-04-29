@@ -212,12 +212,41 @@ def train(
 
         elif loss_type == "BCEWithKL":
             mask_gen = Mask_Generator(model, inputs,
-                                      patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-            mask_inputs = mask_gen.create_mask_inputs()
+                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs = mask_gen.create_mask_inputs(mode="KL")
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
             loss = criterion(outputs, mask_outputs, labels, model, lambdas)
+        
+        elif loss_type == "DoubleBCE":
+            mask_gen = Mask_Generator(model, inputs,
+                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs = mask_gen.create_mask_inputs(mode="KL")
+            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+            mask_outputs = model(mask_inputs)
+            # mask_labels = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
+
+            loss = criterion(outputs, mask_outputs, labels, labels)
+        
+        elif loss_type == "VillaKL":
+            mask_gen_KL = Mask_Generator(model, inputs,
+                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs_KL = mask_gen_KL.create_mask_inputs(mode="KL")
+            mask_inputs_KL = torch.from_numpy(mask_inputs_KL.astype(np.float32)).to(device)
+
+            mask_gen_Villa = Mask_Generator(model, inputs,
+                                            patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs_Villa = mask_gen_Villa.create_mask_inputs(mode="CE")
+            mask_inputs_Villa = torch.from_numpy(mask_inputs_Villa.astype(np.float32)).to(device)
+
+            mask_outputs_KL = model(mask_inputs_KL)
+            mask_outputs_Villa = model(mask_inputs_Villa)
+
+            mask_labels_Villa = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
+
+            loss = criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, mask_labels_Villa, model, lambdas)
+
 
         loss.backward()
         total_loss += loss.item()
@@ -253,7 +282,7 @@ def main(args: argparse.Namespace):
         is_transform=args.is_transform
     )
     data_params = get_parameter_depend_in_data_set(
-        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), alpha=args.ratio_KL
+        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), alpha=args.loss_ratio_alpha, beta=args.loss_ratio_beta
     )
 
     # モデルの作成
@@ -530,7 +559,7 @@ def parse_args():
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
     )
     parser.add_argument(
-        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "BCEWithKL", "MaskKL"], default="SingleBCE"
+        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "BCEWithKL", "VillaKL"], default="SingleBCE"
     )
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--patch_size", type=int, default=1)
@@ -539,16 +568,19 @@ def parse_args():
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )
     parser.add_argument(
-        "--is_transform", type=bool, default=True
+        "--is_transform", type=bool, default=False
     )
     parser.add_argument(
         "--ratio_src_image", type=float, default=0.1
     )
     parser.add_argument(
-        "--ratio_KL", type=float, default=0.5
+        "--save_mask_image", type=bool, default=False
     )
     parser.add_argument(
-        "--save_mask_image", type=bool, default=False
+        "--loss_ratio_alpha", type=float, default=0.5
+    )
+    parser.add_argument(
+        "--loss_ratio_beta", type=float, default=0.5
     )
 
     return parse_with_config(parser)

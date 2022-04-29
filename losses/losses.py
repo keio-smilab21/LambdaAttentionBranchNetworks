@@ -29,9 +29,9 @@ class DoubleBCE(nn.Module):
         self.BCE_orig = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         self.BCE_mask = nn.BCEWithLogitsLoss()
     
-    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
+    def forward(self, outputs, outputs_mask, targets, mask_targets, model=None, lambdas=None):
         self.loss_orig = calculate_loss(self.BCE_orig, outputs, targets, model, lambdas)
-        self.loss_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask, targets)
+        self.loss_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask, mask_targets)
 
         return self.loss_orig + self.alpha * self.loss_mask
 
@@ -51,9 +51,9 @@ class BCEWithKL(nn.Module):
 
         return self.loss_BCE + self.alpha * self.loss_KL
 
-class MaskKL(nn.Module):
+class VillaKL(nn.Module):
     def __init__(self, pos_weight, alpha=1.0, beta=1.0):
-        super(MaskKL, self).__init__()
+        super(VillaKL, self).__init__()
 
         self.pos_weight = pos_weight
         self.alpha = alpha
@@ -63,9 +63,9 @@ class MaskKL(nn.Module):
         self.BCE_mask = nn.BCEWithLogitsLoss()
         self.KL = nn.KLDivLoss(log_target=True, reduction="batchmean")
 
-    def forward(self, outputs, outputs_mask_BCE, outputs_KL, targets, model=None, lambdas=None):
+    def forward(self, outputs, outputs_mask_KL, outputs_mask_Villa, targets, mask_targets_Villa, model=None, lambdas=None):
         self.loss_BCE_orig = calculate_loss(self.BCE_orig, outputs, targets, model, lambdas)
-        self.loss_BCE_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask_BCE, targets)
-        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_KL, targets)
+        self.loss_BCE_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask_Villa, mask_targets_Villa)
+        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask_KL, outputs)
 
         return self.loss_BCE_orig + self.alpha * self.loss_BCE_mask + self.beta * self.loss_KL

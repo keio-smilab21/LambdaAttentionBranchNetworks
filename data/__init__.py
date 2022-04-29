@@ -13,7 +13,7 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
-from losses.losses import DoubleBCE, BCEWithKL, MaskKL
+from losses.losses import DoubleBCE, BCEWithKL, VillaKL
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -43,7 +43,7 @@ def create_dataloader_dict(
     image_size: int = 224,
     only_test: bool = False,
     train_ratio: float = 0.9,
-    is_transform: bool = True
+    is_transform: bool = False
 ) -> Dict[str, data.DataLoader]:
     """
     データローダーの作成
@@ -83,7 +83,7 @@ def create_dataloader_dict(
         )
     else:
         train_dataset, val_dataset = create_train_val_dataset(
-            dataset_name, train_ratio, image_size, is_transform
+            dataset_name, train_ratio, image_size, is_transform=is_transform
         )
 
     if dataset_params["sampler"]:
@@ -112,6 +112,7 @@ def get_parameter_depend_in_data_set(
     pos_weight: torch.Tensor = torch.Tensor([1]),
     dataset_root: str = "./datasets",
     alpha: float = 0.5,
+    beta: float = 0.5,
 ) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
@@ -163,12 +164,12 @@ def get_parameter_depend_in_data_set(
     if loss_type == "SingleBCE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif loss_type == "DoubleBCE":
-        params["criterion"] = DoubleBCE(pos_weight=pos_weight)
+        params["criterion"] = DoubleBCE(pos_weight=pos_weight, alpha=alpha)
     elif loss_type == "BCEWithKL":
         params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=alpha)
-    elif loss_type == "MaskKL":
-        params["criterion"] = MaskKL(pos_weight=pos_weight)
-
+    elif loss_type == "VillaKL":
+        params["criterion"] = VillaKL(pos_weight=pos_weight, alpha=alpha, beta=beta)
+    
     return params
 
 
@@ -211,10 +212,10 @@ def create_train_val_dataset(
     dataset_name: str,
     train_ratio: float,
     image_size: int = 224,
-    is_transform: bool = True
+    is_transform: bool = False
 ):
     params = get_parameter_depend_in_data_set(dataset_name)
-    train_transform = create_transform("train", image_size, params, is_transform)
+    train_transform = create_transform("train", image_size, params, is_transform=is_transform)
     test_transform = create_transform("test", image_size, params)
 
     trainval_dataset = params["dataset"](

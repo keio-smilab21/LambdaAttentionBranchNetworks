@@ -36,12 +36,12 @@ class Mask_Generator():
         self.ratio = ratio_src_image
         self.save_mask_input = save_mask_input
 
-    def create_mask_inputs(self):
+    def create_mask_inputs(self, mode="KL"):
         B, C, W, H = self.images.shape
         mask_inputs = np.zeros(shape=self.images.shape)
         attentions = [] # len : 64
         orders = [] # len 64
-        
+
         for i in range(self.images.shape[0]):
             input = self.images[i]
             input = torch.unsqueeze(input, 0)
@@ -58,7 +58,7 @@ class Mask_Generator():
             orders.append(self.calculate_attention_order(attentions[i]))
 
             # mask_inputを作成して返す : (1, 512 ,512)
-            mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], orders[i], mask_mode=self.mask_mode)
+            mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], orders[i], mode=mode, mask_mode=self.mask_mode)
             mask_inputs[i] = mask_input
         
         if self.save_mask_input:
@@ -70,7 +70,7 @@ class Mask_Generator():
             else:
                 im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
             fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/mask_input[-1].png")
+            plt.savefig(f"mask_image/deletion/mask_input_{mode}.png")
             plt.clf()
             plt.close()
 
@@ -92,7 +92,7 @@ class Mask_Generator():
         )
 
 
-    def create_mask_image(self, image, attention, attention_order, mask_mode: str="base"):
+    def create_mask_image(self, image, attention, attention_order, mode: str="KL", mask_mode: str="base"):
         
         if not (image.shape[1:] == attention.shape):
             attention = cv2.resize(
@@ -106,47 +106,84 @@ class Mask_Generator():
         mean, std = params["mean"], params["std"]
         image = reverse_normalize(image.copy(), mean, std)
 
-        step_index = min(self.step * (int(num_insertion*self.ratio + 1)), attention_order.shape[1] - 1) # 220000
+        step_index = min(self.step * (int(num_insertion*self.ratio + 1)), attention_order.shape[1] - 1)
         w_indices = attention_order[0, step_index]
         h_indices = attention_order[1, step_index]
         threthold = attention[w_indices, h_indices]
 
         mask_img = np.zeros(shape=image.shape) # (1, 512, 512)
 
-        if mask_mode in ["blur", "base"]:
-            src_image = image
+        if mode == "KL":
+            if mask_mode in ["blur", "base"]:
+                src_image = image
 
-            if mask_mode == "blur":
-                base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
-            elif mask_mode == "base":
-                base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
-                base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
+                if mask_mode == "blur":
+                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
+                elif mask_mode == "base":
+                    base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
+                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
-            if len(base_mask_image.shape) == 3:
-                print("transform base_mask_image")
-                base_mask_image = base_mask_image.transpose(2, 0, 1)
-            if len(base_mask_image.shape) == 2:
-                base_mask_image = base_mask_image.reshape(C, H, W)
+                if len(base_mask_image.shape) == 3:
+                    print("transform base_mask_image")
+                    base_mask_image = base_mask_image.transpose(2, 0, 1)
+                if len(base_mask_image.shape) == 2:
+                    base_mask_image = base_mask_image.reshape(C, H, W)
 
-            mask_src = np.where(threthold <= attention, 1.0, 0.0)
-            mask_base = np.where(threthold <= attention, 0.0, 1.0)
-            
-            mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-            mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+                mask_src = np.where(threthold <= attention, 1.0, 0.0)
+                mask_base = np.where(threthold <= attention, 0.0, 1.0)
+                
+                mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+                mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-            for c in range(C):
-                mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
-                mask_img[c] = (mask_img[c] - mean[c]) / std[c]
-            
-        else:
-            mask = np.where(threthold <= attention, 1.0, 0.0)
-            mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+                for c in range(C):
+                    mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
+                    mask_img[c] = (mask_img[c] - mean[c]) / std[c]
+                
+            else:
+                mask = np.where(threthold <= attention, 1.0, 0.0)
+                mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-            for c in range(C):
-                if mask_mode == "black":
-                    mask_img[c] = (image[c] * mask - mean[c]) / std[c]
-                elif mask_mode == "mean":
-                    mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
+                for c in range(C):
+                    if mask_mode == "black":
+                        mask_img[c] = (image[c] * mask - mean[c]) / std[c]
+                    elif mask_mode == "mean":
+                        mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
+        
+        elif mode == "CE":
+            if mask_mode in ["blur", "base"]:
+                src_image = image
+
+                if mask_mode == "blur":
+                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
+                elif mask_mode == "base":
+                    base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
+                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
+
+                if len(base_mask_image.shape) == 3:
+                    print("transform base_mask_image")
+                    base_mask_image = base_mask_image.transpose(2, 0, 1)
+                if len(base_mask_image.shape) == 2:
+                    base_mask_image = base_mask_image.reshape(C, H, W)
+
+                mask_src = np.where(threthold <= attention, 0.0, 1.0)
+                mask_base = np.where(threthold <= attention, 1.0, 0.0)
+                
+                mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+                mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+
+                for c in range(C):
+                    mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
+                    mask_img[c] = (mask_img[c] - mean[c]) / std[c]
+                
+            else:
+                mask = np.where(threthold <= attention, 0.0, 1.0)
+                mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+
+                for c in range(C):
+                    if mask_mode == "black":
+                        mask_img[c] = (image[c] * mask - mean[c]) / std[c]
+                    elif mask_mode == "mean":
+                        mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
 
         return mask_img
 

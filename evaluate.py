@@ -42,14 +42,41 @@ def test(
         outputs = model(inputs)
         if loss_type == "SingleBCE":
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
+
         elif loss_type == "BCEWithKL":
             mask_gen = Mask_Generator(model, inputs,
-                                      patch_size, step, dataset, mask_mode, ratio_src_image)
+                                    patch_size, step, dataset, mask_mode, ratio_src_image)
             mask_inputs = mask_gen.create_mask_inputs() # (8, 1, 512, 512) float64
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
-
             total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
+        
+        elif loss_type == "DoubleBCE":
+            mask_gen = Mask_Generator(model, inputs,
+                                    patch_size, step, dataset, mask_mode, ratio_src_image)
+            mask_inputs = mask_gen.create_mask_inputs(mode="CE")
+            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+            mask_outputs = model(mask_inputs)
+            mask_labels = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
+
+            total_loss += criterion(outputs, mask_outputs, labels, mask_labels).item()
+        
+        elif loss_type == "VillaKL":
+            mask_gen_KL = Mask_Generator(model, inputs,
+                                    patch_size, step, dataset, mask_mode, ratio_src_image)
+            mask_inputs_KL = mask_gen_KL.create_mask_inputs(mode="KL")
+            mask_inputs_KL = torch.from_numpy(mask_inputs_KL.astype(np.float32)).to(device)
+
+            mask_gen_Villa = Mask_Generator(model, inputs,
+                                            patch_size, step, dataset, mask_mode, ratio_src_image)
+            mask_inputs_Villa = mask_gen_Villa.create_mask_inputs(mode="CE")
+            mask_inputs_Villa = torch.from_numpy(mask_inputs_Villa.astype(np.float32)).to(device)
+
+            mask_outputs_KL = model(mask_inputs_KL)
+            mask_outputs_Villa = model(mask_inputs_Villa)
+            mask_labels_Villa = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
+
+            total_loss += criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, mask_labels_Villa, model, lambdas).item()
 
         metrics.evaluate(outputs, labels)
         total += labels.size(0)

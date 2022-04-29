@@ -62,13 +62,15 @@ class model_CNN_3(nn.Module):
             16, 8, 1, downsample=downsample, norm_layer=nn.BatchNorm2d, size=28
         )
 
-        self.conv2 = nn.Conv2d(32, 32, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.relu2 = nn.ReLU(inplace=True)
-        # self.conv3 = nn.Conv2d(64, 128, kernel_size=7, stride=3, padding=3, bias=False)
+        # self.conv3 = nn.Conv2d(32, 64, kernel_size=7, stride=2, padding=3, bias=False)
         # self.relu3 = nn.ReLU(inplace=True)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.flatten = nn.Flatten()
-        self.fc = nn.Linear(32, num_classes)
+        # self.fc1 = nn.Linear(64, 128)
+        # self.relu4 = nn.ReLU(inplace=True)
+        self.fc2 = nn.Linear(64, num_classes)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -85,7 +87,9 @@ class model_CNN_3(nn.Module):
 
         x = self.avgpool(x)
         x = self.flatten(x)
-        x = self.fc(x)
+        # x = self.fc1(x)
+        # x = self.relu4(x)
+        x = self.fc2(x)
 
         return x
 
