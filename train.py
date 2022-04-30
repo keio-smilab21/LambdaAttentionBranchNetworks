@@ -202,55 +202,30 @@ def train(
     torch.autograd.set_detect_anomaly(True)
 
     model.train()
-    scaler = torch.cuda.amp.GradScaler()
+    # scaler = torch.cuda.amp.GradScaler()
 
     for data in tqdm(dataloader, desc="Train: "):
         inputs, labels = data[0].to(device), data[1].to(device)
         
         optimizer.zero_grad()
 
-        with torch.cuda.amp.autocast():
-            outputs = model(inputs)
+        # with torch.cuda.amp.autocast():
+        outputs = model(inputs)
 
-            if loss_type == "SingleBCE":
-                loss = calculate_loss(criterion, outputs, labels, model, lambdas)
+        if loss_type == "SingleBCE":
+            loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
-            elif loss_type == "BCEWithKL":
-                mask_gen = Mask_Generator(model, inputs,
-                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-                mask_inputs = mask_gen.create_mask_inputs(mode="KL")
-                mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
-                mask_outputs = model(mask_inputs)
+        elif loss_type in ["BCEWithKL", "DoubleBCE", "VillaKL"]:
+            mask_gen = Mask_Generator(model, inputs,
+                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_inputs = mask_gen.create_mask_inputs()
+            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+            mask_outputs = model(mask_inputs)
 
-                loss = criterion(outputs, mask_outputs, labels, model, lambdas)
-            
-            elif loss_type == "DoubleBCE":
-                mask_gen = Mask_Generator(model, inputs,
-                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-                mask_inputs = mask_gen.create_mask_inputs(mode="KL")
-                mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
-                mask_outputs = model(mask_inputs)
-
-                loss = criterion(outputs, mask_outputs, labels)
-            
-            elif loss_type == "VillaKL":
-                mask_gen_KL = Mask_Generator(model, inputs,
-                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-                mask_inputs_KL = mask_gen_KL.create_mask_inputs(mode="KL")
-                mask_inputs_KL = torch.from_numpy(mask_inputs_KL.astype(np.float32)).to(device)
-
-                mask_gen_Villa = Mask_Generator(model, inputs,
-                                                patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-                mask_inputs_Villa = mask_gen_Villa.create_mask_inputs(mode="CE")
-                mask_inputs_Villa = torch.from_numpy(mask_inputs_Villa.astype(np.float32)).to(device)
-
-                mask_outputs_KL = model(mask_inputs_KL)
-                mask_outputs_Villa = model(mask_inputs_Villa)
-
-                loss = criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, model, lambdas)
+            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
         
-        scaler.scale(loss).backward()
-        # loss.backward()
+        # scaler.scale(loss).backward()
+        loss.backward()
 
         total_loss += loss.item()
         metric.evaluate(outputs, labels)
@@ -262,11 +237,10 @@ def train(
             loss_sam.backward()
             optimizer.second_step(zero_grad=True)
         else:
-            scaler.step(optimizer)
-            # optimizer.step()
+            # scaler.step(optimizer)
+            optimizer.step()
 
-        
-        scaler.update()
+        # scaler.update()
 
         total += labels.size(0)
 
@@ -321,8 +295,6 @@ def main(args: argparse.Namespace):
     )
     scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
                                     warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
-    # scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
-    #                                 warmup_t=3, warmup_lr_init=5e-5, warmup_prefix=True)
 
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
     #     optimizer,
@@ -333,7 +305,7 @@ def main(args: argparse.Namespace):
     #     verbose=True,
     # )
 
-    criterion = data_params["criterion"] # 損失関数の定義
+    criterion = data_params["criterion"]
     metric = data_params["metric"]
 
     # run_name の 作成 (for save_dir / wandb)
@@ -364,7 +336,6 @@ def main(args: argparse.Namespace):
     configs["pretrained"] = best_path
     save_json(configs, os.path.join(save_dir, "config.json"))
 
-    # モデルの詳細表示（torchsummary）
     summary(
         model,
         (args.batch_size, data_params["num_channel"], args.image_size, args.image_size),
@@ -378,7 +349,6 @@ def main(args: argparse.Namespace):
         print(f"\n[Epoch {epoch+1}]")
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
-                continue
                 loss, metric = train(
                     dataloader,
                     args.dataset,

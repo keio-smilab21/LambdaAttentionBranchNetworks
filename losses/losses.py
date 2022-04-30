@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from utils.loss import calculate_loss, criterion_with_cast_targets
@@ -44,9 +43,9 @@ class BCEWithKL(nn.Module):
         self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         self.KL = nn.KLDivLoss(log_target=True, reduction="batchmean")
     
-    def forward(self, outputs, outputs_KL, targets, model=None, lambdas=None):
+    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
-        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_KL, outputs)
+        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
 
         return self.loss_BCE + self.alpha * self.loss_KL
 
@@ -62,10 +61,10 @@ class VillaKL(nn.Module):
         self.Villa = nn.BCEWithLogitsLoss(reduction="none")
         self.KL = nn.KLDivLoss(log_target=True, reduction="batchmean")
 
-    def forward(self, outputs, outputs_mask_KL, outputs_mask_Villa, targets, model=None, lambdas=None):
+    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
-        villa = criterion_with_cast_targets(self.Villa, outputs_mask_Villa, targets)
+        villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
         self.loss_Villa = (F.one_hot(targets, num_classes=2) * villa).mean()
-        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask_KL, outputs)
+        self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
 
         return self.loss_BCE + self.alpha * self.loss_Villa + self.beta * self.loss_KL

@@ -18,7 +18,7 @@ class Mask_Generator():
     def __init__(
         self,
         model: nn.Module,
-        images: torch.Tensor, # 複数
+        images: torch.Tensor,
         patch_size: int,
         step: int,
         dataset: Dataset,
@@ -35,11 +35,11 @@ class Mask_Generator():
         self.mask_mode = mask_mode
         self.ratio = ratio_src_image
         self.save_mask_input = save_mask_input
+        self.attentions = [] # len 64
+        self.orders = [] # len 64
 
-    def create_mask_inputs(self, mode="KL"):
+    def create_mask_inputs(self):
         mask_inputs = np.zeros(shape=self.images.shape)
-        attentions = [] # len : 64
-        orders = [] # len 64
 
         for i in range(self.images.shape[0]):
             input = self.images[i]
@@ -56,13 +56,13 @@ class Mask_Generator():
                     attention = cv2.resize(
                         attention[0].astype(np.float32), dsize=(self.images[i].shape[1], self.images[i].shape[2])
                     )
-            attentions.append(attention) # (512, 512)
+            self.attentions.append(attention) # (512, 512)
 
             # attentionの順位を計算
-            orders.append(self.calculate_attention_order(attentions[i]))
+            self.orders.append(self.calculate_attention_order(self.attentions[i]))
 
-            # mask_inputを作成して返す : (1, 512 ,512)
-            mask_input = self.create_mask_image(self.images[i].cpu().numpy(), attentions[i], orders[i], mode=mode, mask_mode=self.mask_mode)
+            # mask_inputを作成 : (1, 512 ,512)
+            mask_input = self.create_mask_image(idx=i, mask_mode=self.mask_mode)
             mask_inputs[i] = mask_input
         
         if self.save_mask_input:
@@ -74,7 +74,7 @@ class Mask_Generator():
             else:
                 im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
             fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/mask_input_{mode}.png")
+            plt.savefig(f"mask_image/deletion/mask_input_KL.png")
             plt.clf()
             plt.close()
 
@@ -96,7 +96,10 @@ class Mask_Generator():
         )
 
 
-    def create_mask_image(self, image, attention, attention_order, mode: str="KL", mask_mode: str="base"):
+    def create_mask_image(self, idx, mask_mode: str="base"):
+        image = self.images[idx].cpu().numpy()
+        attention = self.attentions[idx]
+        attention_order = self.orders[idx]
         
         if not (image.shape[1:] == attention.shape):
             attention = cv2.resize(
@@ -117,77 +120,40 @@ class Mask_Generator():
 
         mask_img = np.zeros(shape=image.shape) # (1, 512, 512)
 
-        if mode == "KL":
-            if mask_mode in ["blur", "base"]:
-                src_image = image
+        if mask_mode in ["blur", "base"]:
+            src_image = image
 
-                if mask_mode == "blur":
-                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
-                elif mask_mode == "base":
-                    base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
-                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
+            if mask_mode == "blur":
+                base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
+            elif mask_mode == "base":
+                base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
+                base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
-                if len(base_mask_image.shape) == 3:
-                    print("transform base_mask_image")
-                    base_mask_image = base_mask_image.transpose(2, 0, 1)
-                if len(base_mask_image.shape) == 2:
-                    base_mask_image = base_mask_image.reshape(C, H, W)
+            if len(base_mask_image.shape) == 3:
+                print("transform base_mask_image")
+                base_mask_image = base_mask_image.transpose(2, 0, 1)
+            if len(base_mask_image.shape) == 2:
+                base_mask_image = base_mask_image.reshape(C, H, W)
 
-                mask_src = np.where(threthold <= attention, 1.0, 0.0)
-                mask_base = np.where(threthold <= attention, 0.0, 1.0)
-                
-                mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-                mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+            mask_src = np.where(threthold <= attention, 1.0, 0.0)
+            mask_base = np.where(threthold <= attention, 0.0, 1.0)
+            
+            mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+            mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-                for c in range(C):
-                    mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
-                    mask_img[c] = (mask_img[c] - mean[c]) / std[c]
-                
-            else:
-                mask = np.where(threthold <= attention, 1.0, 0.0)
-                mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
+            for c in range(C):
+                mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
+                mask_img[c] = (mask_img[c] - mean[c]) / std[c]
+            
+        else:
+            mask = np.where(threthold <= attention, 1.0, 0.0)
+            mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
-                for c in range(C):
-                    if mask_mode == "black":
-                        mask_img[c] = (image[c] * mask - mean[c]) / std[c]
-                    elif mask_mode == "mean":
-                        mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
-        
-        elif mode == "CE":
-            if mask_mode in ["blur", "base"]:
-                src_image = image
-
-                if mask_mode == "blur":
-                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
-                elif mask_mode == "base":
-                    base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
-                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
-
-                if len(base_mask_image.shape) == 3:
-                    print("transform base_mask_image")
-                    base_mask_image = base_mask_image.transpose(2, 0, 1)
-                if len(base_mask_image.shape) == 2:
-                    base_mask_image = base_mask_image.reshape(C, H, W)
-
-                mask_src = np.where(threthold <= attention, 0.0, 1.0)
-                mask_base = np.where(threthold <= attention, 1.0, 0.0)
-                
-                mask_src = cv2.resize(mask_src, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-                mask_base = cv2.resize(mask_base, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-
-                for c in range(C):
-                    mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
-                    mask_img[c] = (mask_img[c] - mean[c]) / std[c]
-                
-            else:
-                mask = np.where(threthold <= attention, 0.0, 1.0)
-                mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
-
-                for c in range(C):
-                    if mask_mode == "black":
-                        mask_img[c] = (image[c] * mask - mean[c]) / std[c]
-                    elif mask_mode == "mean":
-                        mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
+            for c in range(C):
+                if mask_mode == "black":
+                    mask_img[c] = (image[c] * mask - mean[c]) / std[c]
+                elif mask_mode == "mean":
+                    mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
 
         return mask_img
 
@@ -222,6 +188,6 @@ def return_attention(
     assert isinstance(model, AttentionBranchModel)
     attentions = model.attention_branch.attention  # (32, 1, 512, 512)
     attention = attentions[idx]
-    attention: np.ndarray = attention.cpu().clone().detach().numpy()
+    attention = attention.cpu().clone().detach().numpy()
 
     return attention
