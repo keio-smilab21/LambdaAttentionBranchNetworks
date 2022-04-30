@@ -1,5 +1,4 @@
 import random
-from turtle import pos
 from typing import Any, Callable, Dict, List, Optional
 
 import torch
@@ -182,10 +181,10 @@ def create_transform(
     image_set: str,
     image_size: int,
     params: Dict[str, Any],
-    p_random_erasing: float = 0.5,
     is_transform: bool = False
 ):
     if image_set == "train" and is_transform:
+        print("Pay Attention : dataset Transformed!!")
         return transforms.Compose(
             [
                 transforms.Resize((image_size, image_size)),
