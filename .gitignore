@@ -196,6 +196,7 @@ cython_debug/
 /wandb/
 insertion/
 deletion/
+mask_image/
 launch.json
 attention.png
 test.*
