@@ -4,7 +4,6 @@ import os
 from typing import Dict, Iterable, Optional, Tuple
 
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,6 +12,7 @@ import wandb
 from torchinfo import summary
 from torchvision.models.resnet import Bottleneck as TorchBottleneck
 from tqdm import tqdm
+from timm.scheduler import CosineLRScheduler
 
 from data import ALL_DATASETS, create_dataloader_dict, get_parameter_depend_in_data_set
 from evaluate import test
@@ -202,53 +202,56 @@ def train(
     torch.autograd.set_detect_anomaly(True)
 
     model.train()
+    scaler = torch.cuda.amp.GradScaler()
+
     for data in tqdm(dataloader, desc="Train: "):
-        inputs, labels = data[0].to(device), data[1].to(device) # iputs ; (32, 1, 512, 512), labels: (32)
+        inputs, labels = data[0].to(device), data[1].to(device)
+        
         optimizer.zero_grad()
-        outputs = model(inputs)
 
-        if loss_type == "SingleBCE":
-            loss = calculate_loss(criterion, outputs, labels, model, lambdas)
+        with torch.cuda.amp.autocast():
+            outputs = model(inputs)
 
-        elif loss_type == "BCEWithKL":
-            mask_gen = Mask_Generator(model, inputs,
-                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-            mask_inputs = mask_gen.create_mask_inputs(mode="KL")
-            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
-            mask_outputs = model(mask_inputs)
+            if loss_type == "SingleBCE":
+                loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
-            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
+            elif loss_type == "BCEWithKL":
+                mask_gen = Mask_Generator(model, inputs,
+                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+                mask_inputs = mask_gen.create_mask_inputs(mode="KL")
+                mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+                mask_outputs = model(mask_inputs)
+
+                loss = criterion(outputs, mask_outputs, labels, model, lambdas)
+            
+            elif loss_type == "DoubleBCE":
+                mask_gen = Mask_Generator(model, inputs,
+                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+                mask_inputs = mask_gen.create_mask_inputs(mode="KL")
+                mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
+                mask_outputs = model(mask_inputs)
+
+                loss = criterion(outputs, mask_outputs, labels)
+            
+            elif loss_type == "VillaKL":
+                mask_gen_KL = Mask_Generator(model, inputs,
+                                        patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+                mask_inputs_KL = mask_gen_KL.create_mask_inputs(mode="KL")
+                mask_inputs_KL = torch.from_numpy(mask_inputs_KL.astype(np.float32)).to(device)
+
+                mask_gen_Villa = Mask_Generator(model, inputs,
+                                                patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+                mask_inputs_Villa = mask_gen_Villa.create_mask_inputs(mode="CE")
+                mask_inputs_Villa = torch.from_numpy(mask_inputs_Villa.astype(np.float32)).to(device)
+
+                mask_outputs_KL = model(mask_inputs_KL)
+                mask_outputs_Villa = model(mask_inputs_Villa)
+
+                loss = criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, model, lambdas)
         
-        elif loss_type == "DoubleBCE":
-            mask_gen = Mask_Generator(model, inputs,
-                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-            mask_inputs = mask_gen.create_mask_inputs(mode="KL")
-            mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
-            mask_outputs = model(mask_inputs)
-            # mask_labels = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
+        scaler.scale(loss).backward()
+        # loss.backward()
 
-            loss = criterion(outputs, mask_outputs, labels, labels)
-        
-        elif loss_type == "VillaKL":
-            mask_gen_KL = Mask_Generator(model, inputs,
-                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-            mask_inputs_KL = mask_gen_KL.create_mask_inputs(mode="KL")
-            mask_inputs_KL = torch.from_numpy(mask_inputs_KL.astype(np.float32)).to(device)
-
-            mask_gen_Villa = Mask_Generator(model, inputs,
-                                            patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
-            mask_inputs_Villa = mask_gen_Villa.create_mask_inputs(mode="CE")
-            mask_inputs_Villa = torch.from_numpy(mask_inputs_Villa.astype(np.float32)).to(device)
-
-            mask_outputs_KL = model(mask_inputs_KL)
-            mask_outputs_Villa = model(mask_inputs_Villa)
-
-            mask_labels_Villa = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
-
-            loss = criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, mask_labels_Villa, model, lambdas)
-
-
-        loss.backward()
         total_loss += loss.item()
         metric.evaluate(outputs, labels)
 
@@ -259,7 +262,11 @@ def train(
             loss_sam.backward()
             optimizer.second_step(zero_grad=True)
         else:
-            optimizer.step()
+            scaler.step(optimizer)
+            # optimizer.step()
+
+        
+        scaler.update()
 
         total += labels.size(0)
 
@@ -312,14 +319,19 @@ def main(args: argparse.Namespace):
     optimizer = create_optimizer(
         args.optimizer, params, args.lr, args.weight_decay, args.momentum
     )
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        "min",
-        factor=args.factor,
-        patience=args.scheduler_patience,
-        min_lr=args.min_lr,
-        verbose=True,
-    )
+    scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
+                                    warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
+    # scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
+    #                                 warmup_t=3, warmup_lr_init=5e-5, warmup_prefix=True)
+
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    #     optimizer,
+    #     "min",
+    #     factor=args.factor,
+    #     patience=args.scheduler_patience,
+    #     min_lr=args.min_lr,
+    #     verbose=True,
+    # )
 
     criterion = data_params["criterion"] # 損失関数の定義
     metric = data_params["metric"]
@@ -366,6 +378,7 @@ def main(args: argparse.Namespace):
         print(f"\n[Epoch {epoch+1}]")
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
+                continue
                 loss, metric = train(
                     dataloader,
                     args.dataset,

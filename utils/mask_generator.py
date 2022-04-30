@@ -18,7 +18,7 @@ class Mask_Generator():
     def __init__(
         self,
         model: nn.Module,
-        images: torch.Tensor, # 複数であることに注意
+        images: torch.Tensor, # 複数
         patch_size: int,
         step: int,
         dataset: Dataset,
@@ -29,15 +29,14 @@ class Mask_Generator():
 
         self.model = model
         self.images = images
-        self.step = step
         self.patch_size = patch_size
+        self.step = step
         self.dataset = dataset
         self.mask_mode = mask_mode
         self.ratio = ratio_src_image
         self.save_mask_input = save_mask_input
 
     def create_mask_inputs(self, mode="KL"):
-        B, C, W, H = self.images.shape
         mask_inputs = np.zeros(shape=self.images.shape)
         attentions = [] # len : 64
         orders = [] # len 64
@@ -49,9 +48,14 @@ class Mask_Generator():
             # attentionの値の計算
             attention = return_attention(self.model, i)
             if not (self.images[i].shape[1:] == attention.shape):
-                attention = cv2.resize(
-                    attention[0], dsize=(self.images[i].shape[1], self.images[i].shape[2])
-                )
+                if attention[0].dtype == np.float32:
+                    attention = cv2.resize(
+                        attention[0], dsize=(self.images[i].shape[1], self.images[i].shape[2])
+                    )
+                elif attention[0].dtype == np.float16:
+                    attention = cv2.resize(
+                        attention[0].astype(np.float32), dsize=(self.images[i].shape[1], self.images[i].shape[2])
+                    )
             attentions.append(attention) # (512, 512)
 
             # attentionの順位を計算

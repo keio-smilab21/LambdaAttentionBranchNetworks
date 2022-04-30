@@ -57,9 +57,8 @@ def test(
             mask_inputs = mask_gen.create_mask_inputs(mode="CE")
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
-            mask_labels = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
 
-            total_loss += criterion(outputs, mask_outputs, labels, mask_labels).item()
+            total_loss += criterion(outputs, mask_outputs, labels).item()
         
         elif loss_type == "VillaKL":
             mask_gen_KL = Mask_Generator(model, inputs,
@@ -74,9 +73,8 @@ def test(
 
             mask_outputs_KL = model(mask_inputs_KL)
             mask_outputs_Villa = model(mask_inputs_Villa)
-            mask_labels_Villa = torch.zeros(size=labels.size(), dtype=labels.dtype).to(device)
 
-            total_loss += criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, mask_labels_Villa, model, lambdas).item()
+            total_loss += criterion(outputs, mask_outputs_KL, mask_outputs_Villa, labels, model, lambdas).item()
 
         metrics.evaluate(outputs, labels)
         total += labels.size(0)

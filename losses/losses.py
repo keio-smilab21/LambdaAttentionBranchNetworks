@@ -1,5 +1,3 @@
-from tkinter.tix import CELL
-from cv2 import CAP_PROP_INTELPERC_DEPTH_SATURATION_VALUE
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -26,14 +24,15 @@ class DoubleBCE(nn.Module):
         self.pos_weight = pos_weight
         self.alpha = alpha
         
-        self.BCE_orig = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        self.BCE_mask = nn.BCEWithLogitsLoss()
+        self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        self.Villa = nn.BCEWithLogitsLoss(reduction="none")
     
-    def forward(self, outputs, outputs_mask, targets, mask_targets, model=None, lambdas=None):
-        self.loss_orig = calculate_loss(self.BCE_orig, outputs, targets, model, lambdas)
-        self.loss_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask, mask_targets)
+    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
+        self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
+        villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
+        self.loss_Villa = (F.one_hot(targets, num_classes=2) * villa).mean()
 
-        return self.loss_orig + self.alpha * self.loss_mask
+        return self.loss_BCE + self.alpha * self.loss_Villa
 
 class BCEWithKL(nn.Module):
     def __init__(self, pos_weight, alpha=1.0):
@@ -59,13 +58,14 @@ class VillaKL(nn.Module):
         self.alpha = alpha
         self.beta = beta
 
-        self.BCE_orig = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-        self.BCE_mask = nn.BCEWithLogitsLoss()
+        self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+        self.Villa = nn.BCEWithLogitsLoss(reduction="none")
         self.KL = nn.KLDivLoss(log_target=True, reduction="batchmean")
 
-    def forward(self, outputs, outputs_mask_KL, outputs_mask_Villa, targets, mask_targets_Villa, model=None, lambdas=None):
-        self.loss_BCE_orig = calculate_loss(self.BCE_orig, outputs, targets, model, lambdas)
-        self.loss_BCE_mask = criterion_with_cast_targets(self.BCE_mask, outputs_mask_Villa, mask_targets_Villa)
+    def forward(self, outputs, outputs_mask_KL, outputs_mask_Villa, targets, model=None, lambdas=None):
+        self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
+        villa = criterion_with_cast_targets(self.Villa, outputs_mask_Villa, targets)
+        self.loss_Villa = (F.one_hot(targets, num_classes=2) * villa).mean()
         self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask_KL, outputs)
 
-        return self.loss_BCE_orig + self.alpha * self.loss_BCE_mask + self.beta * self.loss_KL
+        return self.loss_BCE + self.alpha * self.loss_Villa + self.beta * self.loss_KL

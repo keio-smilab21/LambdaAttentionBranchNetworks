@@ -61,7 +61,7 @@ def create_dataloader_dict(
 
     test_dataset = create_dataset(dataset_name, "test", image_size)
     test_dataloader = data.DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True,
     )
 
     if only_test:
@@ -89,11 +89,16 @@ def create_dataloader_dict(
     if dataset_params["sampler"]:
         train_dataloader = data.DataLoader(
             train_dataset,
+            num_workers=2,
+            pin_memory=True,
             batch_sampler=BalancedBatchSampler(train_dataset, 2, batch_size // 2),
         )
     else:
         train_dataloader = data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True
+            train_dataset,
+            num_workers=2,
+            pin_memory=True,
+            batch_size=batch_size, shuffle=True
         )
     val_dataloader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
