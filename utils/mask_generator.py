@@ -46,7 +46,7 @@ class Mask_Generator():
             input = torch.unsqueeze(input, 0)
                 
             # attentionの値の計算
-            attention = return_attention(self.model, i)
+            attention = return_attention(self.model, idx=i)
             if not (self.images[i].shape[1:] == attention.shape):
                 if attention[0].dtype == np.float32:
                     attention = cv2.resize(
@@ -59,7 +59,7 @@ class Mask_Generator():
             self.attentions.append(attention) # (512, 512)
 
             # attentionの順位を計算
-            self.orders.append(self.calculate_attention_order(self.attentions[i]))
+            self.orders.append(self.calculate_attention_order(idx=i))
 
             # mask_inputを作成 : (1, 512 ,512)
             mask_input = self.create_mask_image(idx=i, mask_mode=self.mask_mode)
@@ -81,11 +81,11 @@ class Mask_Generator():
         return mask_inputs # (64, 1, 512, 512)
 
 
-    def calculate_attention_order(self, attention):
+    def calculate_attention_order(self, idx):
         """
         attentionの順番を計算する
-        path_insdelとはdeletion / insertion を逆にする
         """
+        attention = self.attentions[idx]
         attention_flat = np.ravel(attention)
         order = np.argsort(-attention_flat)
 
@@ -100,12 +100,8 @@ class Mask_Generator():
         image = self.images[idx].cpu().numpy()
         attention = self.attentions[idx]
         attention_order = self.orders[idx]
-        
-        if not (image.shape[1:] == attention.shape):
-            attention = cv2.resize(
-                attention[0], dsize=(image.shape[1], image.shape[2])
-            )
-        C, W, H = image.shape # (1, 512, 512)
+
+        C, W, H = image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
 
@@ -118,7 +114,7 @@ class Mask_Generator():
         h_indices = attention_order[1, step_index]
         threthold = attention[w_indices, h_indices]
 
-        mask_img = np.zeros(shape=image.shape) # (1, 512, 512)
+        mask_img = np.zeros(shape=image.shape)
 
         if mask_mode in ["blur", "base"]:
             src_image = image
@@ -162,27 +158,10 @@ def map_2d_indices(indices_1d: int, width: int):
     """
     1次元のflattenされたindexを元に戻す
     index配列自体を二次元にするわけではなく、index番号のみ変換
-
-    Args:
-        indices_1d(array): インデックス
-        width(int)       : 横幅
-
-    Examples:
-        [[0, 1, 2], [3, 4, 5]]
-        -> [0, 1, 2, 3, 4, 5]
-
-        map_2d_indices(1, 3)
-        >>> [0, 1]
-        map_ed_indices(5, 3)
-        >>> [1, 2]
-
-        flattenする前の配列のindexを返す
     """
     return [indices_1d // width, indices_1d % width]
 
-def return_attention(
-    model: nn.Module,
-    idx: int
+def return_attention(model: nn.Module, idx: int
 ) -> Tuple[np.ndarray, bool]:
 
     assert isinstance(model, AttentionBranchModel)

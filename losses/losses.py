@@ -16,13 +16,12 @@ class SingleBCE(nn.Module):
 
         return self.loss
 
-class DoubleBCE(nn.Module):
+class BCEWithVilla(nn.Module):
     def __init__(self, pos_weight, alpha=1.0):
-        super(DoubleBCE, self).__init__()
+        super(BCEWithVilla, self).__init__()
         
         self.pos_weight = pos_weight
         self.alpha = alpha
-        
         self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         self.Villa = nn.BCEWithLogitsLoss(reduction="none")
     

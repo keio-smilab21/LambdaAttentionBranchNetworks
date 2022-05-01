@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
 from data.sampler import BalancedBatchSampler
-from losses.losses import DoubleBCE, BCEWithKL, VillaKL
+from losses.losses import BCEWithVilla, BCEWithKL, VillaKL
 
 ALL_DATASETS = ["IDRiD", "magnetogram"]
 
@@ -167,8 +167,8 @@ def get_parameter_depend_in_data_set(
     
     if loss_type == "SingleBCE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-    elif loss_type == "DoubleBCE":
-        params["criterion"] = DoubleBCE(pos_weight=pos_weight, alpha=alpha)
+    elif loss_type == "BCEWithVilla":
+        params["criterion"] = BCEWithVilla(pos_weight=pos_weight, alpha=alpha)
     elif loss_type == "BCEWithKL":
         params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=alpha)
     elif loss_type == "VillaKL":

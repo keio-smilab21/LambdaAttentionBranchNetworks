@@ -215,9 +215,9 @@ def train(
         if loss_type == "SingleBCE":
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
-        elif loss_type in ["BCEWithKL", "DoubleBCE", "VillaKL"]:
-            mask_gen = Mask_Generator(model, inputs,
-                                    patch_size, step, dataset, mask_mode, ratio_src_image, save_mask_image)
+        elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
+            mask_gen = Mask_Generator(model, inputs, patch_size, step,
+                                        dataset, mask_mode, ratio_src_image, save_mask_image)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
@@ -542,7 +542,7 @@ def parse_args():
         "--run_name", type=str, help="save in save_dir/run_name and wandb name"
     )
     parser.add_argument(
-        "--loss_type", type=str, choices=["SingleBCE", "DoubleBCE", "BCEWithKL", "VillaKL"], default="SingleBCE"
+        "--loss_type", type=str, choices=["SingleBCE", "BCEWithVilla", "BCEWithKL", "VillaKL"], default="SingleBCE"
     )
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--patch_size", type=int, default=1)

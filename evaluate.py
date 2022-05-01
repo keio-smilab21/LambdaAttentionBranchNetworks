@@ -45,7 +45,7 @@ def test(
         if loss_type == "SingleBCE":
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
 
-        elif loss_type in ["BCEWithKL", "DoubleBCE", "VillaKL"]:
+        elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
             mask_gen = Mask_Generator(model, inputs, patch_size, step,
                                         dataset, mask_mode, ratio_src_image)
             mask_inputs = mask_gen.create_mask_inputs()
