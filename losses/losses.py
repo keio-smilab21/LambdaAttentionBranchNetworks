@@ -28,7 +28,7 @@ class BCEWithVilla(nn.Module):
     def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
         villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
-        self.loss_Villa = (F.one_hot(targets, num_classes=2) * villa).mean()
+        self.loss_Villa = villa[1].mean()
 
         return self.loss_BCE + self.alpha * self.loss_Villa
 
@@ -63,7 +63,7 @@ class VillaKL(nn.Module):
     def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
         villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
-        self.loss_Villa = (F.one_hot(targets, num_classes=2) * villa).mean()
+        self.loss_Villa = villa[1].mean()
         self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
 
         return self.loss_BCE + self.alpha * self.loss_Villa + self.beta * self.loss_KL
