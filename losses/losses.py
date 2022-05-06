@@ -29,9 +29,8 @@ class BCEWithVilla(nn.Module):
     def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
         villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
-        targets_one_hot = F.one_hot(targets, num_classes=2)
-        # self.loss_Villa = (torch.unsqueeze(targets_one_hot[:,1], dim=1) * villa).sum() / targets.sum()
-        self.loss_Villa = (torch.unsqueeze(targets_one_hot[:,1], dim=1) * villa).sum()
+        epsilon = 1e-6
+        self.loss_Villa = (torch.unsqueeze(targets, dim=1) * villa).sum() / (targets.sum() + epsilon)
 
         return self.loss_BCE + self.alpha * self.loss_Villa
 
@@ -66,9 +65,8 @@ class VillaKL(nn.Module):
     def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
         villa = criterion_with_cast_targets(self.Villa, outputs_mask, targets)
-        targets_one_hot = F.one_hot(targets, num_classes=2)
-        # self.loss_Villa = (torch.unsqueeze(targets_one_hot[:,1], dim=1) * villa).sum() / targets.sum()
-        self.loss_Villa = (torch.unsqueeze(targets_one_hot[:,1], dim=1) * villa).sum()
+        epsilon = 1e-6
+        self.loss_Villa = (torch.unsqueeze(targets, dim=1) * villa).sum() / (targets.sum() + epsilon)
         self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
 
         return self.loss_BCE + self.alpha * self.loss_Villa + self.beta * self.loss_KL
