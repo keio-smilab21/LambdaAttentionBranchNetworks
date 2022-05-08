@@ -293,7 +293,10 @@ def main(args: argparse.Namespace):
     optimizer = create_optimizer(
         args.optimizer, params, args.lr, args.weight_decay, args.momentum
     )
-    scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
+    # scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
+    #                                 warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
+    
+    scheduler = CosineLRScheduler(optimizer, t_initial=10, lr_min=1e-4, cycle_limit=10,
                                     warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
 
     # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -331,7 +334,7 @@ def main(args: argparse.Namespace):
         patience=args.early_stopping_patience, save_dir=save_dir
     )
 
-    wandb.init(project=args.dataset, name=run_name)
+    wandb.init(project=args.dataset+"-Villa", name=run_name)
     wandb.config.update(configs)
     configs["pretrained"] = best_path
     save_json(configs, os.path.join(save_dir, "config.json"))

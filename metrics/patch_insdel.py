@@ -321,7 +321,7 @@ def save_mask_image(img,  mode):
         fig, ax = plt.subplots()
         im = ax.imshow(img, vmin=0, vmax=1)
         fig.colorbar(im)
-        plt.savefig(f"{mode}/self.input[{i}].png")
+        plt.savefig(f"{mode}/self.input[a].png")
         # plt.savefig(f"{mode}/blur_image[{i}].png")
         plt.clf()
         plt.close()
