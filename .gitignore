@@ -194,9 +194,13 @@ cython_debug/
 /outputs/
 #  modify the part of datasets
 datasets/IDRID/
-datasets/images_temp
+datasets/images_temp/
+datasets/images/
 datasets/magnetogram/*.npy
 datasets/magnetogram/bias_image.png
+datasets/aia131/
+datasets/aia1600/
+
 
 /wandb/
 insertion/
