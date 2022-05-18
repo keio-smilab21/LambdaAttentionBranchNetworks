@@ -55,7 +55,7 @@ class Aia131(Dataset):
         # add bias_image only when train
         if image_set == "train":
             self.targets += [0]
-            bias_image = Image.open("./datasets/aia131/aia131_bias_image.png").resize((512, 512))
+            bias_image = Image.open("./datasets/aia131/aia131_bias_image.png")
             bias_image = np.asarray(bias_image, dtype=np.uint8)
             bias_image = bias_image[np.newaxis]
             self.images = np.concatenate([self.images, bias_image])

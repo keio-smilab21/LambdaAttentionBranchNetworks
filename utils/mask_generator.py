@@ -25,6 +25,7 @@ class Mask_Generator():
         mask_mode: str,
         ratio_src_image: float = 0.1,
         save_mask_input: bool = False,
+        data_name: str = "mognetogram",
     ) -> None:
 
         self.model = model
@@ -37,6 +38,7 @@ class Mask_Generator():
         self.save_mask_input = save_mask_input
         self.attentions = [] # len 64
         self.orders = [] # len 64
+        self.data_name = data_name
 
     def create_mask_inputs(self):
         mask_inputs = np.zeros(shape=self.images.shape)
@@ -62,7 +64,7 @@ class Mask_Generator():
             self.orders.append(self.calculate_attention_order(idx=i))
 
             # mask_inputを作成 : (1, 512 ,512)
-            mask_input = self.create_mask_image(idx=i, mask_mode=self.mask_mode)
+            mask_input = self.create_mask_image(idx=i, mask_mode=self.mask_mode, data_name=self.data_name)
             mask_inputs[i] = mask_input
         
         if self.save_mask_input:
@@ -70,11 +72,13 @@ class Mask_Generator():
             img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
             fig, ax = plt.subplots()
             if img.shape[-1] == 1:
-                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                # im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                im = ax.imshow(img, cmap="gray")
             else:
-                im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                # im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                im = ax.imshow(img, cmap="gray")
             fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/mask_input_KL.png")
+            plt.savefig(f"mask_image/deletion/mask_{self.data_name}.png")
             plt.clf()
             plt.close()
 
@@ -96,7 +100,7 @@ class Mask_Generator():
         )
 
 
-    def create_mask_image(self, idx, mask_mode: str="base"):
+    def create_mask_image(self, idx, mask_mode: str="base", data_name: str="magnetogram"):
         image = self.images[idx].cpu().numpy()
         attention = self.attentions[idx]
         attention_order = self.orders[idx]
@@ -122,7 +126,7 @@ class Mask_Generator():
             if mask_mode == "blur":
                 base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
             elif mask_mode == "base":
-                base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W))
+                base_mask_image = Image.open(f"./datasets/{data_name}/{data_name}_bias_image.png").resize((H, W))
                 base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
             if len(base_mask_image.shape) == 3:

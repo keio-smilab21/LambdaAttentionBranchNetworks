@@ -183,7 +183,7 @@ def wandb_log(loss: float, metrics: Metric, phase: str) -> None:
 
 def train(
     dataloader: data.DataLoader,
-    dataset: data.Dataset,
+    dataset: str,
     model: nn.Module,
     criterion: nn.modules.loss._Loss,
     optimizer: optim.Optimizer,
@@ -216,8 +216,8 @@ def train(
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
-            mask_gen = Mask_Generator(model, inputs, patch_size, step,
-                                        dataset, mask_mode, ratio_src_image, save_mask_image)
+            mask_gen = Mask_Generator(model, inputs, patch_size, step, dataset,
+                                        mask_mode, ratio_src_image, save_mask_image, data_name=dataset)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
