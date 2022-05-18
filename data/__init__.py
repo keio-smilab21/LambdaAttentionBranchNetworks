@@ -11,10 +11,12 @@ from torch.utils.data import Dataset
 
 from data.IDRID import IDRiDDataset
 from data.magnetogram import Magnetogram
+from data.aia131 import Aia131
+from data.aia1600 import Aia1600
 from data.sampler import BalancedBatchSampler
 from losses.losses import BCEWithVilla, BCEWithKL, VillaKL
 
-ALL_DATASETS = ["IDRiD", "magnetogram"]
+ALL_DATASETS = ["IDRiD", "magnetogram", "aia131", "aia1600"]
 
 
 class SubsetWithTransform(Dataset):
@@ -153,6 +155,40 @@ def get_parameter_depend_in_data_set(
         params["num_channel"] = 1
         params["mean"] = (0.3625,)
         params["std"] = (0.2234,)
+        params["classes"] = ("OC", "MX")
+        params["has_val"] = True
+        params["has_params"] = True
+        params["sampler"] = True
+        params["years"] = {
+            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
+            "val": ["2016"],
+            "test": ["2017"],
+        }
+
+        params["metric"] = FlareMetric()
+    
+    elif dataset_name == "aia131":
+        params["dataset"] = Aia131
+        params["num_channel"] = 1
+        params["mean"] = (0.0358,)
+        params["std"] = (0.0636,)
+        params["classes"] = ("OC", "MX")
+        params["has_val"] = True
+        params["has_params"] = True
+        params["sampler"] = True
+        params["years"] = {
+            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
+            "val": ["2016"],
+            "test": ["2017"],
+        }
+
+        params["metric"] = FlareMetric()
+    
+    elif dataset_name == "aia1600":
+        params["dataset"] = Aia1600
+        params["num_channel"] = 1
+        params["mean"] = (0.0961,)
+        params["std"] = (0.0978,)
         params["classes"] = ("OC", "MX")
         params["has_val"] = True
         params["has_params"] = True

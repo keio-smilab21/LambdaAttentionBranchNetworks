@@ -7,7 +7,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 
-class Magnetogram(Dataset):
+class Aia1600(Dataset):
     """
     Attributes:
         root(str): データセット一覧ディレクトリ root/magnetogramが存在する前提
@@ -28,7 +28,7 @@ class Magnetogram(Dataset):
         self.transform = transform
         years = params["years"][image_set]
 
-        self.data_dir = os.path.join(self.root, "magnetogram")
+        self.data_dir = os.path.join(self.root, "aia1600")
         image_list = []
         self.targets = []
 
@@ -45,7 +45,8 @@ class Magnetogram(Dataset):
             # Transpose [Image_fname, Label]
             annotations = [list(x) for x in zip(*annotations)] # (image_name, label, year) * 7990
 
-            image_list.append(np.load(image_file))
+            images = np.load(image_file) # (B, H, W)
+            image_list.append(images)
             # flag 0, 1 -> 0/ flag 2, 3 -> 1
             self.targets += list(map(lambda x: int(2 <= int(x)), annotations[1])) # 45530
 
@@ -54,7 +55,7 @@ class Magnetogram(Dataset):
         # add bias_image only when train
         if image_set == "train":
             self.targets += [0]
-            bias_image = Image.open("./datasets/magnetogram/bias_image.png").resize((512, 512))
+            bias_image = Image.open("./datasets/aia1600/aia1600_bias_image.png").resize((512, 512))
             bias_image = np.asarray(bias_image, dtype=np.uint8)
             bias_image = bias_image[np.newaxis]
             self.images = np.concatenate([self.images, bias_image])

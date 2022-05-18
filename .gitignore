@@ -200,6 +200,8 @@ datasets/magnetogram/*.npy
 datasets/magnetogram/bias_image.png
 datasets/aia131/
 datasets/aia1600/
+datasets/
+change_dataset_name.sh
 
 
 /wandb/
@@ -210,3 +212,4 @@ launch.json
 attention.png
 test.*
 test.sh
+test*

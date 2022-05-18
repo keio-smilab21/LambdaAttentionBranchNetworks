@@ -54,14 +54,14 @@ def create_bias_image(image_shape: int = (1, 512, 512)):
     plt.imshow(bias_image.reshape(W, H), cmap="gray")
     plt.savefig("temp/bisa_image_raw.png")
 
-def create_bias_image2(image_shape: int = (1, 512, 512)):
+def create_bias_image2(image_shape: int = (1, 512, 512), dataname: str = "magnetogram"):
     dataset = create_dataset(
-        "magnetogram",
+        dataname,
         "train",
         512
     )
     data_param = get_parameter_depend_in_data_set(
-        "magnetogram", pos_weight=torch.Tensor([1.0])
+        dataname, pos_weight=torch.Tensor([1.0])
     )
     mean = data_param["mean"]
     std = data_param["std"]
@@ -76,4 +76,4 @@ def create_bias_image2(image_shape: int = (1, 512, 512)):
     print("bias_image", bias_image.shape)
     
     # save_image(bias_image[np.newaxis], "temp/bias_image.png", (0,), (1,))
-    cv2.imwrite("temp/bias_image.png", bias_image)
+    cv2.imwrite(f"{dataname}_bias_image.png", bias_image)
