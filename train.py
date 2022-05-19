@@ -370,6 +370,7 @@ def main(args: argparse.Namespace):
             else:
                 loss, metric = test(
                     dataloader,
+                    args.dataset,
                     model,
                     criterion,
                     metric,

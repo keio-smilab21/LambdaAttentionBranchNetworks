@@ -20,6 +20,7 @@ from utils.mask_generator import Mask_Generator
 @torch.no_grad()
 def test(
     dataloader: data.DataLoader,
+    data_name: str,
     model: nn.Module,
     criterion: nn.modules.loss._Loss,
     metrics: Metric,
@@ -47,7 +48,7 @@ def test(
 
         elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
             mask_gen = Mask_Generator(model, inputs, patch_size, step,
-                                        dataset, mask_mode, ratio_src_image)
+                                        dataset, mask_mode, ratio_src_image, data_name=data_name)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)

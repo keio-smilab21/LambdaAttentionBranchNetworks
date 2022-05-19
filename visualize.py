@@ -76,6 +76,7 @@ def calculate_attention(
 @torch.no_grad()
 def visualize(
     dataloader: data.DataLoader,
+    data_name: str,
     model: nn.Module,
     method: str,
     batch_size: int,
@@ -91,7 +92,7 @@ def visualize(
 ) -> Union[None, Metric]:
     if evaluate:
         pid = PatchInsertionDeletion(
-            model, batch_size, patch_size, step, params["name"], device, mask_mode=mask_mode, dataloader=dataloader
+            model, batch_size, patch_size, step, params["name"], device, mask_mode=mask_mode, dataloader=dataloader, data_name=data_name
         )
         insdel_save_dir = os.path.join(save_dir, "insdel")
         if not os.path.isdir(insdel_save_dir):
@@ -199,6 +200,7 @@ def main(args: argparse.Namespace) -> None:
 
     metrics = visualize(
         dataloader,
+        args.dataset,
         model,
         args.method,
         args.batch_size,

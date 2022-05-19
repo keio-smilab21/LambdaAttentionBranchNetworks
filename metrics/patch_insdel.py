@@ -31,7 +31,8 @@ class PatchInsertionDeletion(Metric):
         dataset: str,
         device: torch.device,
         mask_mode: str,
-        dataloader
+        dataloader,
+        data_name: str,
     ) -> None:
         self.total = 0
         self.total_insertion = 0
@@ -46,6 +47,7 @@ class PatchInsertionDeletion(Metric):
         self.device = device
         self.patch_size = patch_size
         self.dataset = dataset
+        self.data_name = data_name
 
         self.mask_mode = mask_mode
 
@@ -112,7 +114,7 @@ class PatchInsertionDeletion(Metric):
             lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
         )
 
-    def generate_insdel_images(self, mode: str, mask_mode: str="black"):
+    def generate_insdel_images(self, mode: str, mask_mode: str="black",):
         C, W, H = self.image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
@@ -136,7 +138,7 @@ class PatchInsertionDeletion(Metric):
                 if mask_mode == "blur":
                     base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
                 elif mask_mode == "base":
-                    base_mask_image = Image.open("./datasets/magnetogram/bias_image.png").resize((H, W)) # ここまではOK
+                    base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W)) # ここまではOK
                     base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0 # ここまではOK (512, 512)
 
                 if len(base_mask_image.shape) == 3:
