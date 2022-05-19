@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 from typing import Dict, Iterable, Optional, Tuple
+import random
 
 import numpy as np
 import torch
@@ -204,6 +205,9 @@ def train(
     model.train()
     # scaler = torch.cuda.amp.GradScaler()
 
+    MASK_RATIO_CHOICES = [0.2, 0.3, 0.4, 0.5, 0.6]
+    WEIGHT = [0.3, 0.25, 0.2, 0.15, 0.1]
+
     for data in tqdm(dataloader, desc="Train: "):
         inputs, labels = data[0].to(device), data[1].to(device)
         
@@ -216,8 +220,11 @@ def train(
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
+            mask_ratio = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
+            # ratio_src_image -> mask_ratio
             mask_gen = Mask_Generator(model, inputs, patch_size, step, dataset,
-                                        mask_mode, ratio_src_image, save_mask_image, data_name=dataset)
+                                        mask_mode, mask_ratio
+, save_mask_image, data_name=dataset)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
