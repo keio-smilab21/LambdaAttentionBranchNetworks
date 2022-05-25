@@ -14,6 +14,9 @@ from data import get_parameter_depend_in_data_set
 from models.attention_branch import AttentionBranchModel
 from utils.utils import reverse_normalize
 
+MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
+WEIGHT = [0.2, 0.5, 0.2, 0.1]
+
 class Mask_Generator():
     def __init__(
         self,
@@ -69,6 +72,7 @@ class Mask_Generator():
         
         if self.save_mask_input:
             # mask 画像の保存
+            print("mask_raito : ", self.ratio)
             img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
             fig, ax = plt.subplots()
             if img.shape[-1] == 1:
@@ -78,7 +82,7 @@ class Mask_Generator():
                 # im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                 im = ax.imshow(img, cmap="gray")
             fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/mask_{self.data_name}.png")
+            plt.savefig(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
             plt.clf()
             plt.close()
 
@@ -117,6 +121,8 @@ class Mask_Generator():
         w_indices = attention_order[0, step_index]
         h_indices = attention_order[1, step_index]
         threthold = attention[w_indices, h_indices]
+
+        # print(f"num_insertion : {num_insertion}, step : {step_index}")
 
         mask_img = np.zeros(shape=image.shape)
 

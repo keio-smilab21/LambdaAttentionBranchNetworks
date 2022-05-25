@@ -119,6 +119,7 @@ def get_parameter_depend_in_data_set(
     dataset_root: str = "./datasets",
     alpha: float = 0.5,
     beta: float = 0.5,
+    is_add_val: bool = False,
 ) -> Dict[str, Any]:
     """
     データセットのパラメータを取得
@@ -148,59 +149,44 @@ def get_parameter_depend_in_data_set(
         params["std"] = (0.3083, 0.1643, 0.0829)
         params["classes"] = ("normal", "abnormal")
         params["has_val"] = False
-
         params["metric"] = Accuracy()
-    elif dataset_name == "magnetogram":
-        params["dataset"] = Magnetogram
+
+    else:
+        if dataset_name == "magnetogram":
+            params["dataset"] = Magnetogram
+            params["mean"] = (0.3625,)
+            params["std"] = (0.2234,)
+
+        elif dataset_name == "aia131":
+            params["dataset"] = Aia131
+            params["mean"] = (0.0358,)
+            params["std"] = (0.0636,)
+
+        elif dataset_name == "aia1600":
+            params["dataset"] = Aia1600
+            params["mean"] = (0.0961,)
+            params["std"] = (0.0978,)
+
         params["num_channel"] = 1
-        params["mean"] = (0.3625,)
-        params["std"] = (0.2234,)
         params["classes"] = ("OC", "MX")
         params["has_val"] = True
         params["has_params"] = True
         params["sampler"] = True
-        params["years"] = {
-            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
-            "val": ["2016"],
-            "test": ["2017"],
-        }
-
+        # TODO: add_val
+        if is_add_val:
+            params["years"] = {
+                "train": ["2010", "2011", "2012", "2013", "2014",],
+                "val": ["2015", "2016"],
+                "test": ["2017"],
+            }
+        else:
+            params["years"] = {
+                "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
+                "val": ["2016"],
+                "test": ["2017"],
+            }
         params["metric"] = FlareMetric()
-    
-    elif dataset_name == "aia131":
-        params["dataset"] = Aia131
-        params["num_channel"] = 1
-        params["mean"] = (0.0358,)
-        params["std"] = (0.0636,)
-        params["classes"] = ("OC", "MX")
-        params["has_val"] = True
-        params["has_params"] = True
-        params["sampler"] = True
-        params["years"] = {
-            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
-            "val": ["2016"],
-            "test": ["2017"],
-        }
 
-        params["metric"] = FlareMetric()
-    
-    elif dataset_name == "aia1600":
-        params["dataset"] = Aia1600
-        params["num_channel"] = 1
-        params["mean"] = (0.0961,)
-        params["std"] = (0.0978,)
-        params["classes"] = ("OC", "MX")
-        params["has_val"] = True
-        params["has_params"] = True
-        params["sampler"] = True
-        params["years"] = {
-            "train": ["2010", "2011", "2012", "2013", "2014", "2015"],
-            "val": ["2016"],
-            "test": ["2017"],
-        }
-
-        params["metric"] = FlareMetric()
-    
     if loss_type == "SingleBCE":
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif loss_type == "BCEWithVilla":

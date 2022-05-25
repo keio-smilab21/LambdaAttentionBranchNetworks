@@ -2,7 +2,6 @@ import argparse
 import datetime
 import os
 from typing import Dict, Iterable, Optional, Tuple
-import random
 
 import numpy as np
 import torch
@@ -27,7 +26,7 @@ from optim.sam import SAM
 from utils.loss import calculate_loss
 from utils.utils import fix_seed, module_generator, parse_with_config, save_json
 from utils.visualize import save_attention_map
-from utils.mask_generator import Mask_Generator
+from utils.mask_generator import Mask_Generator, MASK_RATIO_CHOICES, WEIGHT
 
 
 class EarlyStopping:
@@ -195,6 +194,7 @@ def train(
     lambdas: Optional[Dict[str, float]] = None,
     loss_type: str = "singleBCE",
     ratio_src_image: float = 0.1,
+    is_mask_ratio_random : bool = False,
     save_mask_image: bool = False,
     
 ) -> Tuple[float, Metric]:
@@ -204,9 +204,6 @@ def train(
 
     model.train()
     # scaler = torch.cuda.amp.GradScaler()
-
-    MASK_RATIO_CHOICES = [0.2, 0.3, 0.4, 0.5, 0.6]
-    WEIGHT = [0.3, 0.25, 0.2, 0.15, 0.1]
 
     for data in tqdm(dataloader, desc="Train: "):
         inputs, labels = data[0].to(device), data[1].to(device)
@@ -220,11 +217,11 @@ def train(
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
-            mask_ratio = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
-            # ratio_src_image -> mask_ratio
+            # TODO: ratio_src_image -> mask_ratio
+            if is_mask_ratio_random:
+                ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
             mask_gen = Mask_Generator(model, inputs, patch_size, step, dataset,
-                                        mask_mode, mask_ratio
-, save_mask_image, data_name=dataset)
+                                        mask_mode, ratio_src_image, save_mask_image, data_name=dataset)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
@@ -270,7 +267,8 @@ def main(args: argparse.Namespace):
         is_transform=args.is_transform
     )
     data_params = get_parameter_depend_in_data_set(
-        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), alpha=args.loss_ratio_alpha, beta=args.loss_ratio_beta
+        args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), 
+        alpha=args.loss_ratio_alpha, beta=args.loss_ratio_beta, is_add_val=args.is_add_val
     )
 
     # モデルの作成
@@ -300,20 +298,30 @@ def main(args: argparse.Namespace):
     optimizer = create_optimizer(
         args.optimizer, params, args.lr, args.weight_decay, args.momentum
     )
-    # scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
-    #                                 warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
-    
-    scheduler = CosineLRScheduler(optimizer, t_initial=10, lr_min=1e-4, cycle_limit=10,
-                                    warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
 
-    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-    #     optimizer,
-    #     "min",
-    #     factor=args.factor,
-    #     patience=args.scheduler_patience,
-    #     min_lr=args.min_lr,
-    #     verbose=True,
-    # )
+    # TODO: add argparse
+    if args.scheduler_type == "step":
+        print("scheduer step")
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            "min",
+            factor=args.factor,
+            patience=args.scheduler_patience,
+            min_lr=args.min_lr,
+            verbose=True,
+        )
+    elif args.scheduler_type == "cos_epochs":
+        print("scheduler cos_epochs")
+        scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
+                                        warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
+    elif args.scheduler_type == "cos_10":
+        print("scheduler cos_10")
+        scheduler = CosineLRScheduler(optimizer, t_initial=10, lr_min=1e-4, cycle_limit=10,
+                                        warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
+    elif args.scheduler_type == "cos_8":
+        print("scheduler cos_8")
+        scheduler = CosineLRScheduler(optimizer, t_initial=8, lr_min=1e-4, cycle_limit=10,
+                                        warmup_t=5, warmup_lr_init=1e-4, warmup_prefix=True)
 
     criterion = data_params["criterion"]
     metric = data_params["metric"]
@@ -372,6 +380,7 @@ def main(args: argparse.Namespace):
                     lambdas=lambdas,
                     loss_type=args.loss_type,
                     ratio_src_image=args.ratio_src_image,
+                    is_mask_ratio_random=args.is_mask_ratio_random,
                     save_mask_image=args.save_mask_image,
                 )
             else:
@@ -390,6 +399,7 @@ def main(args: argparse.Namespace):
                     args.mask_mode,
                     loss_type = args.loss_type,
                     ratio_src_image = args.ratio_src_image,
+                    is_mask_ratio_random=args.is_mask_ratio_random,
                 )
 
             metric_log = metric.log() # acc 
@@ -562,19 +572,28 @@ def parse_args():
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )
     parser.add_argument(
-        "--is_transform", type=bool, default=False
+        "--is_transform", type=bool, default=False, help="use only when True"
     )
     parser.add_argument(
         "--ratio_src_image", type=float, default=0.1
     )
     parser.add_argument(
-        "--save_mask_image", type=bool, default=False
+        "--save_mask_image", type=bool, default=False, help="use only when True"
     )
     parser.add_argument(
         "--loss_ratio_alpha", type=float, default=0.5
     )
     parser.add_argument(
         "--loss_ratio_beta", type=float, default=0.5
+    )
+    parser.add_argument(
+        "--is_mask_ratio_random", type=bool, default=False, help="use only when True"
+    )
+    parser.add_argument(
+        "--is_add_val", type=bool, default=False, help="use only when add 2015 to val "
+    )
+    parser.add_argument(
+        "--scheduler_type", type=str, choices=["step", "cos_8", "cos_10", "cos_epochs"], default="step"
     )
 
     return parse_with_config(parser)

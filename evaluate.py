@@ -14,7 +14,7 @@ from metrics.base import Metric
 from models import ALL_MODELS, create_model
 from utils.utils import fix_seed, parse_with_config
 from utils.loss import calculate_loss
-from utils.mask_generator import Mask_Generator
+from utils.mask_generator import Mask_Generator, MASK_RATIO_CHOICES, WEIGHT
 
 
 @torch.no_grad()
@@ -33,6 +33,7 @@ def test(
     mask_mode: str = "base",
     loss_type: str = "SingleBCE",
     ratio_src_image: float = 0.1,
+    is_mask_ratio_random: bool = False,
 ) -> Tuple[float, Metric]:
 
     total = 0
@@ -47,6 +48,9 @@ def test(
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
 
         elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
+            # TODO: ratio_srd_image -> mask_ratio
+            if is_mask_ratio_random:
+                ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
             mask_gen = Mask_Generator(model, inputs, patch_size, step,
                                         dataset, mask_mode, ratio_src_image, data_name=data_name)
             mask_inputs = mask_gen.create_mask_inputs()
