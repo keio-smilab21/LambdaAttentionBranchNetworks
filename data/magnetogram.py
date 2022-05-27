@@ -53,12 +53,12 @@ class Magnetogram(Dataset):
 
         # add bias_image only when train
         # TODO: 比較実験のためコメントアウト
-        # if image_set == "train":
-        #     self.targets += [0]
-        #     bias_image = Image.open("./datasets/magnetogram/magnetogram_bias_image.png").resize((512, 512))
-        #     bias_image = np.asarray(bias_image, dtype=np.uint8)
-        #     bias_image = bias_image[np.newaxis]
-        #     self.images = np.concatenate([self.images, bias_image])
+        if image_set == "train":
+            self.targets += [0]
+            bias_image = Image.open("./datasets/magnetogram/magnetogram_bias_image.png").resize((512, 512))
+            bias_image = np.asarray(bias_image, dtype=np.uint8)
+            bias_image = bias_image[np.newaxis]
+            self.images = np.concatenate([self.images, bias_image])
 
 
     def __getitem__(self, index) -> Tuple[Any, Any]:
