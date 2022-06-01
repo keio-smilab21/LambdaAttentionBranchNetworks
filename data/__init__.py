@@ -174,6 +174,7 @@ def get_parameter_depend_in_data_set(
         params["sampler"] = True
         # TODO: add_val
         if is_add_val:
+            print("add val ", is_add_val)
             params["years"] = {
                 "train": ["2010", "2011", "2012", "2013", "2014",],
                 "val": ["2015", "2016"],
