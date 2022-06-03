@@ -134,8 +134,8 @@ class AttentionBranch(nn.Module):
             self.conv2 = conv1x1(hidden_channel, hidden_channel)
             self.bn2 = nn.BatchNorm2d(hidden_channel)
             self.conv3 = conv1x1(hidden_channel, 1)
-            self.bn3 = nn.BatchNorm2d(1)
-
+            # self.bn3 = nn.BatchNorm2d(1)
+            self.ln3 = nn.LayerNorm((1, 128, 128))
         self.sigmoid = nn.Sigmoid()
 
         self.conv4 = conv1x1(hidden_channel, num_classes)
@@ -190,7 +190,20 @@ class AttentionBranch(nn.Module):
         attention = self.relu(attention)
 
         attention = self.conv3(attention)
-        attention = self.bn3(attention)
+        # attention = self.bn3(attention)
+        attention = self.ln3(attention) # (32, 1, 128, 128)
+
+        # TODO: test attention norm
+        attention_flat = attention.squeeze(1) # (32, 128, 128)
+        attention_flat = attention.flatten(1) # (32, 16384)
+        attention_std = (attention_flat - attention_flat.mean(dim=1).unsqueeze(1).repeat(1, attention_flat.shape[-1])) # 標準化
+        attention_std /= attention_flat.std(dim=1).unsqueeze(1).repeat(1, attention_flat.shape[-1]) # 標準化
+        attention_norm_min, _ = attention_std.min(dim=1) # 64
+        attention_std = attention_std - attention_norm_min.unsqueeze(1).repeat(1, attention_std.shape[-1]) # 正の方向に持ってくる
+        attention_norm_max, _ = attention_std.max(dim=1)
+        attention_std /= attention_norm_max.unsqueeze(1).repeat(1, attention_std.shape[-1])
+        
+        attention = attention_std.view(attention.shape)
 
         self.attention_order = attention
         self.attention = self.sigmoid(attention)
