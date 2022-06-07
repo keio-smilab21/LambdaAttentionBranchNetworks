@@ -34,6 +34,7 @@ def test(
     loss_type: str = "SingleBCE",
     ratio_src_image: float = 0.1,
     is_mask_ratio_random: bool = False,
+    has_loss_attention: bool = False,
 ) -> Tuple[float, Metric]:
 
     total = 0
@@ -57,7 +58,10 @@ def test(
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
+            if has_loss_attention:
+                total_loss += criterion(outputs, mask_outputs, labels, model, lambdas, model.attention_branch.attention).item()
+            else:
+                total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
 
         metrics.evaluate(outputs, labels)
         total += labels.size(0)

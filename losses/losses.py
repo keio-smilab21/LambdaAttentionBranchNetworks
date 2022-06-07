@@ -35,20 +35,25 @@ class BCEWithVilla(nn.Module):
         return self.loss_BCE + self.alpha * self.loss_Villa
 
 class BCEWithKL(nn.Module):
-    def __init__(self, pos_weight, alpha=1.0):
+    def __init__(self, pos_weight, alpha=1.0, beta=1.0,):
         super(BCEWithKL, self).__init__()
         
         self.pos_weight = pos_weight
         self.alpha = alpha
+        self.beta = beta
 
         self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
         self.KL = nn.KLDivLoss(log_target=True, reduction="batchmean")
     
-    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None):
+    def forward(self, outputs, outputs_mask, targets, model=None, lambdas=None, attention=None):
         self.loss_BCE = calculate_loss(self.BCE, outputs, targets, model, lambdas)
         self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
-
-        return self.loss_BCE + self.alpha * self.loss_KL
+        
+        if attention is not None:
+            attention_sum = attention.sum()
+            return self.loss_BCE + self.alpha * self.loss_KL + self.beta * attention_sum
+        else:
+            return self.loss_BCE + self.alpha * self.loss_KL
 
 class VillaKL(nn.Module):
     def __init__(self, pos_weight, alpha=1.0, beta=1.0):

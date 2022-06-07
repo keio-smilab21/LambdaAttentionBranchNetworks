@@ -196,6 +196,7 @@ def train(
     ratio_src_image: float = 0.1,
     is_mask_ratio_random : bool = False,
     save_mask_image: bool = False,
+    has_loss_atteniton: bool = False,
     
 ) -> Tuple[float, Metric]:
     total = 0
@@ -226,7 +227,10 @@ def train(
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
 
-            loss = criterion(outputs, mask_outputs, labels, model, lambdas)
+            if has_loss_atteniton:
+                loss = criterion(outputs, mask_outputs, labels, model, lambdas, model.attention_branch.attention)
+            else:
+                loss = criterion(outputs, mask_outputs, labels, model, lambdas)
         
         # scaler.scale(loss).backward()
         loss.backward()
@@ -264,7 +268,8 @@ def main(args: argparse.Namespace):
         args.batch_size,
         args.image_size,
         train_ratio=args.train_ratio,
-        is_transform=args.is_transform
+        is_transform=args.is_transform,
+        is_add_val = args.is_add_val,
     )
     data_params = get_parameter_depend_in_data_set(
         args.dataset, args.loss_type, pos_weight=torch.Tensor(args.loss_weights).to(device), 
@@ -382,6 +387,7 @@ def main(args: argparse.Namespace):
                     ratio_src_image=args.ratio_src_image,
                     is_mask_ratio_random=args.is_mask_ratio_random,
                     save_mask_image=args.save_mask_image,
+                    has_loss_atteniton=args.has_loss_attention,
                 )
             else:
                 loss, metric = test(
@@ -400,6 +406,7 @@ def main(args: argparse.Namespace):
                     loss_type = args.loss_type,
                     ratio_src_image = args.ratio_src_image,
                     is_mask_ratio_random=args.is_mask_ratio_random,
+                    has_loss_attention=args.has_loss_attention,
                 )
 
             metric_log = metric.log() # acc 
@@ -594,6 +601,9 @@ def parse_args():
     )
     parser.add_argument(
         "--scheduler_type", type=str, choices=["step", "cos_8", "cos_10", "cos_epochs"], default="step"
+    )
+    parser.add_argument(
+        "--has_loss_attention", type=bool, default=False, help="whether add attention loss or not"
     )
 
     return parse_with_config(parser)

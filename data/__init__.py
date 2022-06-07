@@ -44,7 +44,8 @@ def create_dataloader_dict(
     image_size: int = 224,
     only_test: bool = False,
     train_ratio: float = 0.9,
-    is_transform: bool = False
+    is_transform: bool = False,
+    is_add_val: bool = False,
 ) -> Dict[str, data.DataLoader]:
     """
     データローダーの作成
@@ -60,7 +61,7 @@ def create_dataloader_dict(
         dataloader_dict : データローダーのdict
     """
 
-    test_dataset = create_dataset(dataset_name, "test", image_size)
+    test_dataset = create_dataset(dataset_name, "test", image_size, is_add_val=is_add_val)
     test_dataloader = data.DataLoader(
         test_dataset, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=True,
     )
@@ -68,7 +69,7 @@ def create_dataloader_dict(
     if only_test:
         return {"Test": test_dataloader}
 
-    dataset_params = get_parameter_depend_in_data_set(dataset_name)
+    dataset_params = get_parameter_depend_in_data_set(dataset_name, is_add_val=is_add_val)
 
     # valの作成 or 分割
     if dataset_params["has_val"]:
@@ -76,11 +77,13 @@ def create_dataloader_dict(
             dataset_name,
             "train",
             image_size,
+            is_add_val=is_add_val
         )
         val_dataset = create_dataset(
             dataset_name,
             "val",
             image_size,
+            is_add_val=is_add_val
         )
     else:
         train_dataset, val_dataset = create_train_val_dataset(
@@ -174,7 +177,7 @@ def get_parameter_depend_in_data_set(
         params["sampler"] = True
         # TODO: add_val
         if is_add_val:
-            print("add val ", is_add_val)
+            print("val : 2015 - 2016")
             params["years"] = {
                 "train": ["2010", "2011", "2012", "2013", "2014",],
                 "val": ["2015", "2016"],
@@ -193,7 +196,7 @@ def get_parameter_depend_in_data_set(
     elif loss_type == "BCEWithVilla":
         params["criterion"] = BCEWithVilla(pos_weight=pos_weight, alpha=alpha)
     elif loss_type == "BCEWithKL":
-        params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=alpha)
+        params["criterion"] = BCEWithKL(pos_weight=pos_weight, alpha=alpha, beta=beta)
     elif loss_type == "VillaKL":
         params["criterion"] = VillaKL(pos_weight=pos_weight, alpha=alpha, beta=beta)
     
@@ -243,7 +246,7 @@ def create_train_val_dataset(
 ):
     params = get_parameter_depend_in_data_set(dataset_name)
     train_transform = create_transform("train", image_size, params, is_transform=is_transform)
-    test_transform = create_transform("test", image_size, params)
+    test_transform = create_transform("test", image_size, params, is_transform=is_transform)
 
     trainval_dataset = params["dataset"](
         root="./datasets",
@@ -271,6 +274,7 @@ def create_dataset(
     image_set: str = "train",
     image_size: int = 224,
     transform: Optional[Callable] = None,
+    is_add_val: bool = False,
 ) -> Dataset:
     """
     データセットの作成
@@ -286,7 +290,7 @@ def create_dataset(
         Dataset : pytorchデータセット
     """
     assert dataset_name in ALL_DATASETS
-    params = get_parameter_depend_in_data_set(dataset_name)
+    params = get_parameter_depend_in_data_set(dataset_name, is_add_val=is_add_val)
 
     if transform is None:
         transform = create_transform(image_set, image_size, params)
