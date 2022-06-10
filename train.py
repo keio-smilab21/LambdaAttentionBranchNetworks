@@ -354,8 +354,9 @@ def main(args: argparse.Namespace):
         patience=args.early_stopping_patience, save_dir=save_dir
     )
 
-    wandb.init(project=args.dataset+"-Villa", name=run_name)
-    wandb.config.update(configs)
+    if args.use_wandb:
+        wandb.init(project=args.dataset+"-Villa", name=run_name)
+        wandb.config.update(configs)
     configs["pretrained"] = best_path
     save_json(configs, os.path.join(save_dir, "config.json"))
 
@@ -604,6 +605,9 @@ def parse_args():
     )
     parser.add_argument(
         "--has_loss_attention", type=bool, default=False, help="whether add attention loss or not"
+    )
+    parser.add_argument(
+        "--use_wandb", type=bool, default=False
     )
 
     return parse_with_config(parser)
