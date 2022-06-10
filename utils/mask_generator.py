@@ -16,6 +16,8 @@ from utils.utils import reverse_normalize
 
 MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
+PATCH_CHOICE = [1, 4, 8, 16, 32]
+WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
 
 class Mask_Generator():
     def __init__(
@@ -32,7 +34,7 @@ class Mask_Generator():
     ) -> None:
 
         self.model = model
-        self.images = images
+        self.images = images # B, C, H, W
         self.patch_size = patch_size
         self.step = step
         self.dataset = dataset
@@ -44,14 +46,17 @@ class Mask_Generator():
         self.data_name = data_name
 
     def create_mask_inputs(self):
-        mask_inputs = np.zeros(shape=self.images.shape)
+        mask_inputs = np.zeros(shape=self.images.shape) # (B, C, H, W)
 
         for i in range(self.images.shape[0]):
-            input = self.images[i]
-            input = torch.unsqueeze(input, 0)
-                
+            input = self.images[i] # C, H, W
+            input = torch.unsqueeze(input, 0) # 1, C, H, W
+
             # attentionの値の計算
-            attention = return_attention(self.model, idx=i)
+            attention = return_attention(self.model, idx=i) # 1, H', W'
+
+            # attention mapのresize : defaultでattention.dtype = float32
+            # TODO: ampのためのifだとしたら反対ちゃうか
             if not (self.images[i].shape[1:] == attention.shape):
                 if attention[0].dtype == np.float32:
                     attention = cv2.resize(
@@ -66,8 +71,8 @@ class Mask_Generator():
             # attentionの順位を計算
             self.orders.append(self.calculate_attention_order(idx=i))
 
-            # mask_inputを作成 : (1, 512 ,512)
-            mask_input = self.create_mask_image(idx=i, mask_mode=self.mask_mode, data_name=self.data_name)
+            # マスク画像を作成 : (1, 512 ,512)
+            mask_input = self.create_mask_image(idx=i)
             mask_inputs[i] = mask_input
         
         if self.save_mask_input:
@@ -76,17 +81,15 @@ class Mask_Generator():
             img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
             fig, ax = plt.subplots()
             if img.shape[-1] == 1:
-                # im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                 im = ax.imshow(img, cmap="gray")
             else:
-                # im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
                 im = ax.imshow(img, cmap="gray")
             fig.colorbar(im)
             plt.savefig(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
             plt.clf()
             plt.close()
 
-        return mask_inputs # (64, 1, 512, 512)
+        return mask_inputs # B, C, H, W
 
 
     def calculate_attention_order(self, idx):
@@ -104,10 +107,15 @@ class Mask_Generator():
         )
 
 
-    def create_mask_image(self, idx, mask_mode: str="base", data_name: str="magnetogram"):
+    def create_mask_image(self, idx):
+        mask_mode = self.mask_mode
+        data_name = self.data_name
         image = self.images[idx].cpu().numpy()
-        attention = self.attentions[idx]
-        attention_order = self.orders[idx]
+        attention = self.attentions[idx] # H, W
+        attention_order = self.orders[idx] # 
+
+        print("atteniton : ", attention.shape)
+        print("attention_order : ", attention_order.shape)
 
         C, W, H = image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
@@ -121,8 +129,6 @@ class Mask_Generator():
         w_indices = attention_order[0, step_index]
         h_indices = attention_order[1, step_index]
         threthold = attention[w_indices, h_indices]
-
-        # print(f"num_insertion : {num_insertion}, step : {step_index}")
 
         mask_img = np.zeros(shape=image.shape)
 
