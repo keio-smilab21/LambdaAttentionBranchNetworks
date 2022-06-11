@@ -24,6 +24,7 @@ class Mask_Generator():
         self,
         model: nn.Module,
         images: torch.Tensor,
+        attention: torch.Tensor,
         patch_size: int,
         step: int,
         dataset: Dataset,
@@ -35,6 +36,7 @@ class Mask_Generator():
 
         self.model = model
         self.images = images # B, C, H, W
+        self.attention = attention.cpu().clone().detach().numpy()
         self.patch_size = patch_size
         self.step = step
         self.dataset = dataset
@@ -53,10 +55,10 @@ class Mask_Generator():
             input = torch.unsqueeze(input, 0) # 1, C, H, W
 
             # attentionの値の計算
-            attention = return_attention(self.model, idx=i) # 1, H', W'
+            attention = self.attention[i]
+            # attention = return_attention(self.model, idx=i) # 1, H', W'
 
-            # attention mapのresize : defaultでattention.dtype = float32
-            # TODO: ampのためのifだとしたら反対ちゃうか
+            # attention map.shape -> origin_image.shape
             if not (self.images[i].shape[1:] == attention.shape):
                 if attention[0].dtype == np.float32:
                     attention = cv2.resize(

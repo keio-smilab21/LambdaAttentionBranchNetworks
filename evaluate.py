@@ -47,11 +47,11 @@ def test(
         if loss_type == "SingleBCE":
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
 
-        elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
-            # TODO: ratio_srd_image -> mask_ratio
+        else:
+            attention = model.attention_branch.attention
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
-            mask_gen = Mask_Generator(model, inputs, patch_size, step,
+            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step,
                                         dataset, mask_mode, ratio_src_image, data_name=data_name)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
