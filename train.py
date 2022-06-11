@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch.utils.data as data
 import wandb
 from torchinfo import summary
@@ -199,26 +200,21 @@ def train(
     has_loss_atteniton: bool = False,
     
 ) -> Tuple[float, Metric]:
-    total = 0
     total_loss: float = 0
-    torch.autograd.set_detect_anomaly(True)
 
+    torch.autograd.set_detect_anomaly(True)
     model.train()
-    # scaler = torch.cuda.amp.GradScaler()
 
     for data in tqdm(dataloader, desc="Train: "):
         inputs, labels = data[0].to(device), data[1].to(device)
         
         optimizer.zero_grad()
-
-        # with torch.cuda.amp.autocast():
         outputs = model(inputs)
 
         if loss_type == "SingleBCE":
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
-        elif loss_type in ["BCEWithKL", "BCEWithVilla", "VillaKL"]:
-            # TODO: ratio_src_image -> mask_ratio
+        else:
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
             mask_gen = Mask_Generator(model, inputs, patch_size, step, dataset,
@@ -232,7 +228,6 @@ def train(
             else:
                 loss = criterion(outputs, mask_outputs, labels, model, lambdas)
         
-        # scaler.scale(loss).backward()
         loss.backward()
 
         total_loss += loss.item()
@@ -245,15 +240,9 @@ def train(
             loss_sam.backward()
             optimizer.second_step(zero_grad=True)
         else:
-            # scaler.step(optimizer)
             optimizer.step()
 
-        # scaler.update()
-
-        total += labels.size(0)
-
-    train_loss = total_loss / total
-    return train_loss, metric
+    return total_loss, metric
 
 
 def main(args: argparse.Namespace):
@@ -304,17 +293,10 @@ def main(args: argparse.Namespace):
         args.optimizer, params, args.lr, args.weight_decay, args.momentum
     )
 
-    # TODO: add argparse
     if args.scheduler_type == "step":
         print("scheduer step")
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            "min",
-            factor=args.factor,
-            patience=args.scheduler_patience,
-            min_lr=args.min_lr,
-            verbose=True,
-        )
+        scheduler = ReduceLROnPlateau(optimizer, "min", factor=args.factor, patience=args.scheduler_patience,
+                                        min_lr=args.min_lr, verbose=True)
     elif args.scheduler_type == "cos_epochs":
         print("scheduler cos_epochs")
         scheduler = CosineLRScheduler(optimizer, t_initial=args.epochs, lr_min=1e-4, 
@@ -357,6 +339,7 @@ def main(args: argparse.Namespace):
     if args.use_wandb:
         wandb.init(project=args.dataset+"-Villa", name=run_name)
         wandb.config.update(configs)
+
     configs["pretrained"] = best_path
     save_json(configs, os.path.join(save_dir, "config.json"))
 
