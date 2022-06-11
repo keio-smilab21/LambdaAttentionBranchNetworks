@@ -37,7 +37,6 @@ def test(
     has_loss_attention: bool = False,
 ) -> Tuple[float, Metric]:
 
-    total = 0
     total_loss: float = 0
 
     model.eval()
@@ -64,10 +63,8 @@ def test(
                 total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
 
         metrics.evaluate(outputs, labels)
-        total += labels.size(0)
 
-    test_loss = total_loss / total
-    return test_loss, metrics
+    return total_loss, metrics
 
 
 def main(args: argparse.Namespace) -> None:

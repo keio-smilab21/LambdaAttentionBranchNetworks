@@ -373,6 +373,7 @@ def main(args: argparse.Namespace):
         print(f"\n[Epoch {epoch+1}]")
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
+                continue
                 loss, metric = train(
                     dataloader,
                     args.dataset,
@@ -413,7 +414,7 @@ def main(args: argparse.Namespace):
             metric_log = metric.log() # acc 
             log = f"{phase}\t| {metric_log} Loss: {loss:.5f} "
 
-            wandb_log(loss, metric, phase)
+            wandb_log(loss, metric, phase) if args.use_wandb else None
 
             if phase == "Val":
                 early_stopping_log = early_stopping(loss, model)

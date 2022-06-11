@@ -114,9 +114,6 @@ class Mask_Generator():
         attention = self.attentions[idx] # H, W
         attention_order = self.orders[idx] # 
 
-        print("atteniton : ", attention.shape)
-        print("attention_order : ", attention_order.shape)
-
         C, W, H = image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
         num_insertion = math.ceil(patch_w * patch_h / self.step)
