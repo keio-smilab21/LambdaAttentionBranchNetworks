@@ -1,5 +1,4 @@
 import math
-from typing import Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,11 +6,9 @@ from PIL import Image
 import cv2
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 from data import get_parameter_depend_in_data_set
-from models.attention_branch import AttentionBranchModel
 from utils.utils import reverse_normalize
 
 MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
@@ -35,7 +32,7 @@ class Mask_Generator():
     ) -> None:
 
         self.model = model
-        self.images = images # B, C, H, W
+        self.images = images                    # B, C, H, W
         self.attention = attention.cpu().clone().detach().numpy()
         self.patch_size = patch_size
         self.step = step
@@ -43,37 +40,35 @@ class Mask_Generator():
         self.mask_mode = mask_mode
         self.ratio = ratio_src_image
         self.save_mask_input = save_mask_input
-        self.attentions = [] # len 64
-        self.orders = [] # len 64
+        self.attentions = []                    # length: 64
+        self.orders = []                        # length: 64
         self.data_name = data_name
 
     def create_mask_inputs(self):
-        mask_inputs = np.zeros(shape=self.images.shape) # (B, C, H, W)
+        mask_inputs = np.zeros(shape=self.images.shape) # B, C, H, W
 
         for i in range(self.images.shape[0]):
-            input = self.images[i] # C, H, W
+            input = self.images[i]            # C, H, W
             input = torch.unsqueeze(input, 0) # 1, C, H, W
 
-            # attentionの値の計算
-            attention = self.attention[i]
-            # attention = return_attention(self.model, idx=i) # 1, H', W'
+            attention = self.attention[i]     # 1, H', W'
 
             # attention map.shape -> origin_image.shape
             if not (self.images[i].shape[1:] == attention.shape):
-                if attention[0].dtype == np.float32:
-                    attention = cv2.resize(
-                        attention[0], dsize=(self.images[i].shape[1], self.images[i].shape[2])
-                    )
-                elif attention[0].dtype == np.float16:
-                    attention = cv2.resize(
-                        attention[0].astype(np.float32), dsize=(self.images[i].shape[1], self.images[i].shape[2])
-                    )
-            self.attentions.append(attention) # (512, 512)
+                H, W = self.images[i].shape[1], self.images[i].shape[2]
+                
+                att_dtype = attention.dtype
+                if att_dtype == np.float32:
+                    attention = cv2.resize(attention[0], dsize=(H, W))
+                elif att_dtype == np.float16:
+                    attention = cv2.resize(attention[0].astype(np.float32), dsize=(H, W))
+
+            self.attentions.append(attention)  # H, W
 
             # attentionの順位を計算
             self.orders.append(self.calculate_attention_order(idx=i))
 
-            # マスク画像を作成 : (1, 512 ,512)
+            # マスク画像を作成 : 1, H, W
             mask_input = self.create_mask_image(idx=i)
             mask_inputs[i] = mask_input
         
@@ -110,11 +105,9 @@ class Mask_Generator():
 
 
     def create_mask_image(self, idx):
-        mask_mode = self.mask_mode
-        data_name = self.data_name
-        image = self.images[idx].cpu().numpy()
-        attention = self.attentions[idx] # H, W
-        attention_order = self.orders[idx] # 
+        image = self.images[idx].cpu().numpy()  # C, H, W
+        attention = self.attentions[idx]        # H, W
+        attention_order = self.orders[idx]      # 2, H*W
 
         C, W, H = image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
@@ -131,13 +124,13 @@ class Mask_Generator():
 
         mask_img = np.zeros(shape=image.shape)
 
-        if mask_mode in ["blur", "base"]:
+        if self.mask_mode in ["blur", "base"]:
             src_image = image
 
-            if mask_mode == "blur":
+            if self.mask_mode == "blur":
                 base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
-            elif mask_mode == "base":
-                base_mask_image = Image.open(f"./datasets/{data_name}/{data_name}_bias_image.png").resize((H, W))
+            elif self.mask_mode == "base":
+                base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                 base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
             if len(base_mask_image.shape) == 3:
@@ -161,9 +154,9 @@ class Mask_Generator():
             mask = cv2.resize(mask, dsize=(W, H), interpolation=cv2.INTER_NEAREST)
 
             for c in range(C):
-                if mask_mode == "black":
+                if self.mask_mode == "black":
                     mask_img[c] = (image[c] * mask - mean[c]) / std[c]
-                elif mask_mode == "mean":
+                elif self.mask_mode == "mean":
                     mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
 
         return mask_img
@@ -175,13 +168,3 @@ def map_2d_indices(indices_1d: int, width: int):
     index配列自体を二次元にするわけではなく、index番号のみ変換
     """
     return [indices_1d // width, indices_1d % width]
-
-def return_attention(model: nn.Module, idx: int
-) -> Tuple[np.ndarray, bool]:
-
-    assert isinstance(model, AttentionBranchModel)
-    attentions = model.attention_branch.attention  # (32, 1, 512, 512)
-    attention = attentions[idx]
-    attention = attention.cpu().clone().detach().numpy()
-
-    return attention

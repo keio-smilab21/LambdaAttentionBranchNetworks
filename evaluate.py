@@ -49,6 +49,7 @@ def test(
 
         else:
             attention = model.attention_branch.attention
+
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
             mask_gen = Mask_Generator(model, inputs, attention, patch_size, step,
@@ -58,7 +59,7 @@ def test(
             mask_outputs = model(mask_inputs)
 
             if has_loss_attention:
-                total_loss += criterion(outputs, mask_outputs, labels, model, lambdas, model.attention_branch.attention).item()
+                total_loss += criterion(outputs, mask_outputs, labels, model, lambdas, attention).item()
             else:
                 total_loss += criterion(outputs, mask_outputs, labels, model, lambdas).item()
 

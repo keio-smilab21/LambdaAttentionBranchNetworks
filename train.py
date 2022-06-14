@@ -225,7 +225,7 @@ def train(
             mask_outputs = model(mask_inputs)
 
             if has_loss_atteniton:
-                loss = criterion(outputs, mask_outputs, labels, model, lambdas, model.attention_branch.attention)
+                loss = criterion(outputs, mask_outputs, labels, model, lambdas, attention)
             else:
                 loss = criterion(outputs, mask_outputs, labels, model, lambdas)
         
@@ -357,7 +357,6 @@ def main(args: argparse.Namespace):
         print(f"\n[Epoch {epoch+1}]")
         for phase, dataloader in dataloader_dict.items():
             if phase == "Train":
-                continue
                 loss, metric = train(
                     dataloader,
                     args.dataset,
