@@ -215,7 +215,7 @@ def train(
             loss = calculate_loss(criterion, outputs, labels, model, lambdas)
 
         else:
-            attention = model.attention_branch.attention
+            attention = model.attention_branch.attention.clone().detach()
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
             mask_gen = Mask_Generator(model, inputs, attention, patch_size, step, dataset,
