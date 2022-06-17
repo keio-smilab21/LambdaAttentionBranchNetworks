@@ -564,13 +564,7 @@ def parse_args():
         "--mask_mode", type=str, choices=["base", "blur", "black", "mean"], default="base"
     )
     parser.add_argument(
-        "--is_transform", type=bool, default=False, help="use only when True"
-    )
-    parser.add_argument(
         "--ratio_src_image", type=float, default=0.1
-    )
-    parser.add_argument(
-        "--save_mask_image", type=bool, default=False, help="use only when True"
     )
     parser.add_argument(
         "--loss_ratio_alpha", type=float, default=0.5
@@ -579,20 +573,17 @@ def parse_args():
         "--loss_ratio_beta", type=float, default=0.5
     )
     parser.add_argument(
-        "--is_mask_ratio_random", type=bool, default=False, help="use only when True"
-    )
-    parser.add_argument(
-        "--is_add_val", type=bool, default=False, help="use only when add 2015 to val "
-    )
-    parser.add_argument(
         "--scheduler_type", type=str, choices=["step", "cos_8", "cos_10", "cos_epochs"], default="step"
     )
-    parser.add_argument(
-        "--has_loss_attention", type=bool, default=False, help="whether add attention loss or not"
-    )
-    parser.add_argument(
-        "--use_wandb", type=bool, default=False
-    )
+
+    # bool系の引数
+    parser.add_argument("--is_transform", action="store_true")
+    parser.add_argument("--is_mask_ratio_random", action="store_true")
+    parser.add_argument("--is_add_val", action="store_true")
+    parser.add_argument("--save_mask_image", action="store_true")
+    parser.add_argument("--has_loss_attention", action="store_true")
+    parser.add_argument("--use_wandb", action="store_true")
+    parser.add_argument("--KL_mask_random", action="store_true")
 
     return parse_with_config(parser)
 
