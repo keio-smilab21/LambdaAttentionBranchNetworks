@@ -28,6 +28,7 @@ class Mask_Generator():
         dataset: Dataset,
         mask_mode: str,
         ratio_src_image: float = 0.1,
+        KL_mask_random: bool = False,
         save_mask_input: bool = False,
         data_name: str = "mognetogram",
     ) -> None:
@@ -41,6 +42,7 @@ class Mask_Generator():
         self.dataset = dataset
         self.mask_mode = mask_mode
         self.ratio = ratio_src_image
+        self.KL_mask_random = KL_mask_random
         self.save_mask_input = save_mask_input
         self.orders = []                        # length: B
         self.data_name = data_name
@@ -167,7 +169,10 @@ class Mask_Generator():
         # self.patch_attention = skimage.measure.block_reduce(
         #     self.attention, (self.patch_size, self.patch_size), np.max
         # ) # (32, 32) = (512/patch_size, 512/patch_size)
-        p_size = self.patch_size
+        if self.KL_mask_random:
+            p_size = np.random.choice(PATCH_CHOICE, p=WEIGHT_PATCH)
+        else:
+            p_size = self.patch_size
         return skimage.measure.block_reduce(attention, (p_size, p_size), np.max)
 
 

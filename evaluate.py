@@ -33,6 +33,7 @@ def test(
     mask_mode: str = "base",
     loss_type: str = "SingleBCE",
     ratio_src_image: float = 0.1,
+    KL_mask_random: bool=False,
     is_mask_ratio_random: bool = False,
     has_loss_attention: bool = False,
 ) -> Tuple[float, Metric]:
@@ -52,8 +53,8 @@ def test(
 
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
-            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step,
-                                        dataset, mask_mode, ratio_src_image, data_name=data_name)
+            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step, dataset, mask_mode,
+                                        ratio_src_image, KL_mask_random=KL_mask_random, data_name=data_name)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)

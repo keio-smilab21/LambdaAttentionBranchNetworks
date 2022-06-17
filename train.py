@@ -195,6 +195,7 @@ def train(
     lambdas: Optional[Dict[str, float]] = None,
     loss_type: str = "singleBCE",
     ratio_src_image: float = 0.1,
+    KL_mask_random: bool = False,
     is_mask_ratio_random : bool = False,
     save_mask_image: bool = False,
     has_loss_atteniton: bool = False,
@@ -218,8 +219,8 @@ def train(
             attention = model.attention_branch.attention.clone().detach()
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
-            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step, dataset,
-                                        mask_mode, ratio_src_image, save_mask_image, data_name=dataset)
+            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step, dataset, mask_mode,
+                                        ratio_src_image, KL_mask_random, save_mask_image, data_name=dataset)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
             mask_outputs = model(mask_inputs)
@@ -370,6 +371,7 @@ def main(args: argparse.Namespace):
                     lambdas=lambdas,
                     loss_type=args.loss_type,
                     ratio_src_image=args.ratio_src_image,
+                    KL_mask_random=args.KL_mask_random,
                     is_mask_ratio_random=args.is_mask_ratio_random,
                     save_mask_image=args.save_mask_image,
                     has_loss_atteniton=args.has_loss_attention,
@@ -390,6 +392,7 @@ def main(args: argparse.Namespace):
                     args.mask_mode,
                     loss_type = args.loss_type,
                     ratio_src_image = args.ratio_src_image,
+                    KL_mask_random=args.KL_mask_random,
                     is_mask_ratio_random=args.is_mask_ratio_random,
                     has_loss_attention=args.has_loss_attention,
                 )
