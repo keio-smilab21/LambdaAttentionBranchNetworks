@@ -50,7 +50,7 @@ class BCEWithKL(nn.Module):
         self.loss_KL = criterion_with_cast_targets(self.KL, outputs_mask, outputs)
         
         if attention is not None:
-            attention_sum = attention.sum()
+            attention_sum = attention.sum() * 1e-6
             return self.loss_BCE + self.alpha * self.loss_KL + self.beta * attention_sum
         else:
             return self.loss_BCE + self.alpha * self.loss_KL

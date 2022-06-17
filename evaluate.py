@@ -48,7 +48,7 @@ def test(
             total_loss += calculate_loss(criterion, outputs, labels, model, lambdas).item()
 
         else:
-            attention = model.attention_branch.attention
+            attention = model.attention_branch.attention.clone().detach()
 
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
