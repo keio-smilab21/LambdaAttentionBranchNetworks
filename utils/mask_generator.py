@@ -16,6 +16,8 @@ MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
 PATCH_CHOICE = [1, 4, 8, 16, 32]
 WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
+# PATCH_CHOICE = [1, 4, 8]
+# WEIGHT_PATCH = [0.75, 0.2, 0.05]
 
 class Mask_Generator():
     def __init__(
@@ -61,14 +63,14 @@ class Mask_Generator():
                 H, W = self.images[i].shape[1], self.images[i].shape[2]
                 attention = cv2.resize(attention[0], dsize=(H, W))
 
-            # attentionをパッチに分割
+            # attention -> patch_attention : 1, H', W' -> p_H, p_W
             patch_attention = self.divide_attention_map_into_patch(attention)
-            self.patch_attentions.append(patch_attention)  # H, W || patch_W, patch_H
+            self.patch_attentions.append(patch_attention)  # p_H, p_W
 
             # patch_attentionの順位を計算
             self.orders.append(self.calculate_attention_order(idx=i))
 
-            # マスク画像を作成 : 1, H, W
+            # make mask_image : 1, H, W
             mask_input = self.create_one_mask_image(idx=i)
             mask_inputs[i] = mask_input
         
@@ -96,20 +98,18 @@ class Mask_Generator():
         patch_attention_flat = np.ravel(patch_attention)
         order = np.argsort(-patch_attention_flat)
 
-        # W, H = attention.shape
-        patch_w, patch_h = patch_attention.shape
-        # patch_w, _ = W // self.patch_size, H // self.patch_size
+        p_w, _ = patch_attention.shape
         return np.apply_along_axis(
-            lambda x: map_2d_indices(x, patch_w), axis=0, arr=order
+            lambda x: map_2d_indices(x, p_w), axis=0, arr=order
         )
 
 
     def create_one_mask_image(self, idx):
-        image = self.images[idx].cpu().numpy()  # C, H, W
+        image = self.images[idx].cpu().numpy()              # C, H, W
         patch_attention = self.patch_attentions[idx]        # p_H, p_W
 
         # attentionの順位
-        patch_attention_order = self.orders[idx]      # 2, p_W*p_H
+        patch_attention_order = self.orders[idx]            # 2, p_W*p_H
 
         C, W, H = image.shape
         patch_w, patch_h = W // self.patch_size, H // self.patch_size
@@ -166,9 +166,6 @@ class Mask_Generator():
     def divide_attention_map_into_patch(self, attention):
         assert attention is not None
 
-        # self.patch_attention = skimage.measure.block_reduce(
-        #     self.attention, (self.patch_size, self.patch_size), np.max
-        # ) # (32, 32) = (512/patch_size, 512/patch_size)
         if self.KL_mask_random:
             p_size = np.random.choice(PATCH_CHOICE, p=WEIGHT_PATCH)
         else:
