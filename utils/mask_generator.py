@@ -147,7 +147,6 @@ class Mask_Generator():
 
             # add channel to bias image
             if len(base_mask_image.shape) == 3:
-                print("transform base_mask_image")
                 base_mask_image = base_mask_image.transpose(2, 0, 1)
             if len(base_mask_image.shape) == 2:
                 base_mask_image = base_mask_image.reshape(C, H, W)
