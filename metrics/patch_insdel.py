@@ -3,7 +3,6 @@ import os
 from typing import Dict, Union
 
 import cv2
-from cv2 import blur
 from matplotlib.animation import ImageMagickBase
 import numpy as np
 import matplotlib.pyplot as plt
@@ -99,9 +98,7 @@ class PatchInsertionDeletion(Metric):
 
         self.patch_attention = skimage.measure.block_reduce(
             self.attention, (self.patch_size, self.patch_size), np.max
-        ) # (32, 32) = (512/patch_size, 512/patch_size)
-        # print("aaaaattention : ", self.attention.shape) -> (512. 512)
-        # print("self.patch_size : ", self.patch_size) -> (16)
+        )
 
     def calculate_attention_order(self):
         attention_flat = np.ravel(self.patch_attention)
@@ -125,21 +122,19 @@ class PatchInsertionDeletion(Metric):
         image = reverse_normalize(self.image.copy(), mean, std)
 
         for i in range(num_insertion):
-            # self.order.shape[1] = (2, N)
-            # print("self.order.shape : ", self.order.shape) (2, 262144)
             step_index = min(self.step * (i + 1), self.order.shape[1] - 1)
             w_indices = self.order[0, step_index]
             h_indices = self.order[1, step_index]
             threthold = self.patch_attention[w_indices, h_indices]
 
             if mask_mode in ["blur", "base"]:
-                src_image = image # 元画像(3, 224, 224) -> RGB
+                src_image = image # C, H, W
 
                 if mask_mode == "blur":
-                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # (224, 224, 3)
+                    base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # H, W, C
                 elif mask_mode == "base":
-                    base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W)) # ここまではOK
-                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0 # ここまではOK (512, 512)
+                    base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
+                    base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0 # H, W
 
                 if len(base_mask_image.shape) == 3:
                     print("transform base_mask_image")
