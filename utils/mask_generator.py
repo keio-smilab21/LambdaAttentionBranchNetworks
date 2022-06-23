@@ -76,16 +76,23 @@ class Mask_Generator():
         
         if self.save_mask_input:
             # mask 画像の保存
-            img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
-            fig, ax = plt.subplots()
-            if img.shape[-1] == 1:
-                im = ax.imshow(img, cmap="gray")
-            else:
-                im = ax.imshow(img, cmap="gray")
-            fig.colorbar(im)
-            plt.savefig(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
-            plt.clf()
-            plt.close()
+            # img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
+            print("aaa", mask_inputs[-1].shape)
+            img = np.transpose(mask_inputs[-1], (1,2,0))
+            params = get_parameter_depend_in_data_set("IDRiD")
+            img = reverse_normalize(img, params["mean"], params["std"])
+            img = (img * 255).astype(np.uint8)
+            # fig, ax = plt.subplots()
+            # if img.shape[-1] == 1:
+            #     im = ax.imshow(img, cmap="gray")
+            # else:
+            #     im = ax.imshow(img, cmap="gray")
+            # fig.colorbar(im)
+            # plt.savefig(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
+            # plt.clf()
+            # plt.close()
+            Image.fromarray(img).save(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
+
 
         return mask_inputs # B, C, H, W
 
@@ -132,9 +139,13 @@ class Mask_Generator():
             if self.mask_mode == "blur":
                 base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
             elif self.mask_mode == "base":
-                base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
+                if self.data_name == "IDRiD":
+                    base_mask_image = Image.open(f"./datasets/IDRID/{self.data_name}_bias_image.png").resize((H, W))
+                else:    
+                    base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                 base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
+            # add channel to bias image
             if len(base_mask_image.shape) == 3:
                 print("transform base_mask_image")
                 base_mask_image = base_mask_image.transpose(2, 0, 1)
