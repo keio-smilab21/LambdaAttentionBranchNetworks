@@ -68,7 +68,7 @@ def main():
     print("bias_image_dtype ;", bias_image.dtype)
 
     # cv2.imwrite(f"IDRiD_bias_image.png", bias_image)
-    Image.fromarray(bias_image).save("IDRiD_bias_image.png")
+    Image.fromarray(bias_image).save("IDRiD_bias_image.jpg")
 
 if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

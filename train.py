@@ -339,7 +339,7 @@ def main(args: argparse.Namespace):
     )
 
     if args.use_wandb:
-        wandb.init(project=args.dataset+"-Villa", name=run_name)
+        wandb.init(project=args.dataset+"-IDRID_ACCV", name=run_name)
         wandb.config.update(configs)
 
     configs["pretrained"] = best_path
