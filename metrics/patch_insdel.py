@@ -134,7 +134,7 @@ class PatchInsertionDeletion(Metric):
                     base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # H, W, C
                 elif mask_mode == "base":
                     if self.dataset == "IDRiD":
-                        base_mask_image = Image.open(f"./datasets/IDRID/IDRiD_bias_image.png")
+                        base_mask_image = Image.open(f"./datasets/IDRID/IDRiD_bias_image.jpg")
                     else:
                         base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                     base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0 # H, W
@@ -158,21 +158,27 @@ class PatchInsertionDeletion(Metric):
                     self.input[i, c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
                     self.input[i, c] = (self.input[i, c] - mean[c]) / std[c]
                 
-                if i%15 == 0:
-                    # img = self.input[i].transpose(1,2,0)
-                    img = (src_image*mask_src + base_mask_image*mask_base).transpose(1,2,0) # (XX, XX, 1(3))
-                    # img = blur_image.transpose(1,2,0)
-                    # save_pid_image(i, img, mode=mode)
-                    fig, ax = plt.subplots()
-                    if img.shape[-1] == 1:
-                        im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
-                    else:
-                        im = ax.imshow(img, vmin=0, vmax=1)
-                    fig.colorbar(im)
-                    plt.savefig(f"{mode}/self.input[{i}].png")
-                    # plt.savefig(f”{mode}/blur_image[{i}].png”)
-                    plt.clf()
-                    plt.close()
+                # if i%15 == 0:
+                #     # img = self.input[i].transpose(1,2,0)
+                #     img = ((src_image * mask_src +  base_mask_image * mask_base) * 255).astype(np.uint8)
+                #     # img = reverse_normalize(img, mean, std)
+                #     img = img.transpose(1,2,0) # (XX, XX, 1(3))
+
+                #     # img = (img * 255).astype(np.uint8)
+
+                #     Image.fromarray(img).save(f"mask_image/deletion/mask_ratio_{i}_.png")
+
+                #     # # save_pid_image(i, img, mode=mode)
+                #     # fig, ax = plt.subplots()
+                #     # if img.shape[-1] == 1:
+                #     #     im = ax.imshow(img, vmin=0, vmax=1, cmap="gray")
+                #     # else:
+                #     #     im = ax.imshow(img, vmin=0, vmax=1)
+                #     # fig.colorbar(im)
+                #     # plt.savefig(f"{mode}/self.input[{i}].png")
+                #     # # plt.savefig(f”{mode}/blur_image[{i}].png”)
+                #     # plt.clf()
+                #     # plt.close()
 
             else:
                 if mode == "insertion":

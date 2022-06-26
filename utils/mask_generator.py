@@ -14,10 +14,10 @@ from utils.utils import reverse_normalize
 
 MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
-PATCH_CHOICE = [1, 4, 8, 16, 32]
-WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
-# PATCH_CHOICE = [1, 4, 8]
-# WEIGHT_PATCH = [0.75, 0.2, 0.05]
+# PATCH_CHOICE = [1, 4, 8, 16, 32]
+# WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
+PATCH_CHOICE = [1, 4, 8]
+WEIGHT_PATCH = [0.5, 0.45, 0.05]
 
 class Mask_Generator():
     def __init__(
@@ -78,9 +78,10 @@ class Mask_Generator():
             # mask 画像の保存
             # img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
             print("aaa", mask_inputs[-1].shape)
-            img = np.transpose(mask_inputs[-1], (1,2,0))
+            # img = np.transpose(mask_inputs[-1], (1,2,0))
             params = get_parameter_depend_in_data_set("IDRiD")
             img = reverse_normalize(img, params["mean"], params["std"])
+            img = np.transpose(mask_inputs[-1], (1,2,0))
             img = (img * 255).astype(np.uint8)
             # fig, ax = plt.subplots()
             # if img.shape[-1] == 1:
@@ -140,7 +141,7 @@ class Mask_Generator():
                 base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
             elif self.mask_mode == "base":
                 if self.data_name == "IDRiD":
-                    base_mask_image = Image.open(f"./datasets/IDRID/{self.data_name}_bias_image.png").resize((H, W))
+                    base_mask_image = Image.open(f"./datasets/IDRID/{self.data_name}_bias_image.jpg").resize((H, W))
                 else:    
                     base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                 base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
