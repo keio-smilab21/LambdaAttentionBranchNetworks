@@ -10,6 +10,7 @@ from tqdm import tqdm
 from utils.utils import fix_seed
 import cv2
 from PIL import Image
+import glob
 
 
 def make_id_bias_image(
@@ -43,6 +44,39 @@ def make_id_bias_image(
     bias_image /= total
 
     return bias_image
+
+def make_bias():
+    # PIL.Image で画像を読み込む
+    train_dir = "./datasets/IDRID/B. Disease Grading/1. Original Images/a. Training Set/"
+    # print("dir_path ; ", train_dir)
+
+    image_list = []
+    for im in glob.glob(train_dir+"IDRiD*"):
+        image_list.append(im)
+    print(len(image_list)) # 413
+    
+    image = np.ones((413, 2848, 4288, 3))
+    print("image[0] : ", image[0].shape)
+
+    # numpy配列に変換する
+    for idx, name in tqdm(enumerate(image_list)):
+        image[idx] = np.asarray(Image.open(name))
+        print("image dtype :", image[idx].dtype)
+        break
+    print("image ; ", image.shape)
+
+    # 平均をとる
+    im_mean = np.mean(image, axis=0)
+    # Image(jpg)に変換する
+    # 保存する
+    pass
+
+def resize_bias():
+    bias_image = Image.open("datasets/IDRID/IDRiD_bias_image.jpg")
+    print("bf : ", bias_image.size)
+    bias_image = bias_image.resize((4288, 2848), Image.LANCZOS)
+    print("af : ", bias_image.size)
+    bias_image.save("resize_bias_image.jpg")
 
 def main():
     fix_seed(args.seed, True)
@@ -83,4 +117,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main()
+    # main()
+    # make_bias()
+    resize_bias()

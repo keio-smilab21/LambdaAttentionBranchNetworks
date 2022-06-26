@@ -56,10 +56,13 @@ class IDRiDDataset(Dataset):
         self.targets = list(map(lambda x: int(1 <= int(x)), annotations[1]))
 
     def __getitem__(self, index) -> Tuple[Any, Any]:
-        image = Image.open(self.images[index]).convert("RGB")
+        image = Image.open(self.images[index]).convert("RGB") # 4288, 2848
 
         # 内側のみの場合 (710, 295, 3269, 2520)
-        image = image.crop((290, 0, 3701, 2849))
+        # im_name :  IDRiD_XXX.jpg or IDRiD_bias_image.jpg
+        im_name = self.images[index].split("/")[-1]
+        if im_name != "IDRiD_bias_image.jpg":
+            image = image.crop((290, 0, 3701, 2849)) # 3411 2849
         target = self.targets[index]
 
         if self.transform is not None:
