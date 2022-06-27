@@ -6,6 +6,7 @@ from utils.loss import calculate_loss, criterion_with_cast_targets
 class SingleBCE(nn.Module):
     def __init__(self, pos_weight):
         super(SingleBCE, self).__init__()
+        print("loss : SingleBCE")
 
         self.pos_weight = pos_weight
         self.BCE = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
@@ -20,6 +21,7 @@ class SingleBCE(nn.Module):
 class BCEWithVilla(nn.Module):
     def __init__(self, pos_weight, alpha=1.0):
         super(BCEWithVilla, self).__init__()
+        print("loss : BCEWithVilla")
         
         self.pos_weight = pos_weight
         self.alpha = alpha
@@ -37,6 +39,8 @@ class BCEWithVilla(nn.Module):
 class BCEWithKL(nn.Module):
     def __init__(self, pos_weight, alpha=1.0, beta=1.0,):
         super(BCEWithKL, self).__init__()
+
+        print("loss : BCEWithKL")
         
         self.pos_weight = pos_weight
         self.alpha = alpha
@@ -58,6 +62,7 @@ class BCEWithKL(nn.Module):
 class VillaKL(nn.Module):
     def __init__(self, pos_weight, alpha=1.0, beta=1.0):
         super(VillaKL, self).__init__()
+        print("loss : VillaKL")
 
         self.pos_weight = pos_weight
         self.alpha = alpha

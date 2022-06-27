@@ -30,7 +30,16 @@ class SubsetWithTransform(Dataset):
     def __getitem__(self, idx):
         img, label = self.dataset[self.indices[idx]]
         if self.transform:
-            img = self.transform(img)
+            img_aug = self.transform(img)
+        
+        transform = transforms.Compose(
+            [
+                transforms.Resize(img_aug.size()[1:]),
+                transforms.ToTensor(),
+            ]
+        )
+        img_vanilla = transform(img)
+        img = torch.cat([img_vanilla, img_aug])
 
         return img, label
 
@@ -192,6 +201,7 @@ def get_parameter_depend_in_data_set(
         params["metric"] = FlareMetric()
 
     if loss_type == "SingleBCE":
+        print("loss : SingleBCE")
         params["criterion"] = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     elif loss_type == "BCEWithVilla":
         params["criterion"] = BCEWithVilla(pos_weight=pos_weight, alpha=alpha)
@@ -228,6 +238,8 @@ def create_transform(
                 # transforms.RandomErasing(),
             ]
         )
+
+    print("No transform")
 
     return transforms.Compose(
         [

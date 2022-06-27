@@ -134,7 +134,7 @@ class PatchInsertionDeletion(Metric):
                     base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size)) # H, W, C
                 elif mask_mode == "base":
                     if self.dataset == "IDRiD":
-                        base_mask_image = Image.open(f"./datasets/IDRID/IDRiD_bias_image.png")
+                        base_mask_image = Image.open(f"./datasets/IDRID/IDRiD_bias_image.jpg")
                     else:
                         base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                     base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0 # H, W

@@ -14,10 +14,11 @@ from utils.utils import reverse_normalize
 
 MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
-PATCH_CHOICE = [1, 4, 8, 16, 32]
-WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
-# PATCH_CHOICE = [1, 4, 8]
+# PATCH_CHOICE = [1, 4, 8, 16, 32]
+# WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
+PATCH_CHOICE = [1, 4, 8]
 # WEIGHT_PATCH = [0.75, 0.2, 0.05]
+WEIGHT_PATCH = [0.50, 0.45, 0.05]
 
 class Mask_Generator():
     def __init__(
@@ -70,7 +71,7 @@ class Mask_Generator():
             # patch_attentionの順位を計算
             self.orders.append(self.calculate_attention_order(idx=i))
 
-            # make mask_image : 1, H, W
+            # make mask_image : C, H, W
             mask_input = self.create_one_mask_image(idx=i)
             mask_inputs[i] = mask_input
         
@@ -140,12 +141,12 @@ class Mask_Generator():
                 base_mask_image = cv2.blur(image.transpose(1,2,0), (self.patch_size, self.patch_size))
             elif self.mask_mode == "base":
                 if self.data_name == "IDRiD":
-                    base_mask_image = Image.open(f"./datasets/IDRID/{self.data_name}_bias_image.png").resize((H, W))
+                    base_mask_image = Image.open(f"./datasets/IDRID/{self.data_name}_bias_image.jpg").resize((H, W))
                 else:    
                     base_mask_image = Image.open(f"./datasets/{self.data_name}/{self.data_name}_bias_image.png").resize((H, W))
                 base_mask_image = np.asarray(base_mask_image, dtype=np.float32) / 255.0
 
-            # add channel to bias image
+            # add channel // transpose to bias image
             if len(base_mask_image.shape) == 3:
                 base_mask_image = base_mask_image.transpose(2, 0, 1)
             if len(base_mask_image.shape) == 2:

@@ -43,6 +43,7 @@ def test(
     model.eval()
     for data in tqdm(dataloader, desc=f"{phase}: "):
         inputs, labels = data[0].to(device), data[1].to(device)
+        inputs = inputs[:, :3]
         outputs = model(inputs)
 
         if loss_type == "SingleBCE":

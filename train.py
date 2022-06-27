@@ -209,6 +209,11 @@ def train(
     for data in tqdm(dataloader, desc="Train: "):
         inputs, labels = data[0].to(device), data[1].to(device)
         
+        # TODO: IDRiD
+        # inputs = inputs[:,3:]
+        inputs = inputs[:,:3]
+        inputs_KL = inputs[:,:3]
+
         optimizer.zero_grad()
         outputs = model(inputs)
 
@@ -219,7 +224,7 @@ def train(
             attention = model.attention_branch.attention.clone().detach()
             if is_mask_ratio_random:
                 ratio_src_image = np.random.choice(MASK_RATIO_CHOICES, p=WEIGHT)
-            mask_gen = Mask_Generator(model, inputs, attention, patch_size, step, dataset, mask_mode,
+            mask_gen = Mask_Generator(model, inputs_KL, attention, patch_size, step, dataset, mask_mode,
                                         ratio_src_image, KL_mask_random, save_mask_image, data_name=dataset)
             mask_inputs = mask_gen.create_mask_inputs()
             mask_inputs = torch.from_numpy(mask_inputs.astype(np.float32)).to(device)
