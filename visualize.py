@@ -195,8 +195,9 @@ def main(args: argparse.Namespace) -> None:
 
     model.to(device)
 
-    wandb.init(project=args.dataset, name=run_name)
-    wandb.config.update(vars(args))
+    if args.use_wandb:
+        wandb.init(project=args.dataset, name=run_name)
+        wandb.config.update(vars(args))
 
     metrics = visualize(
         dataloader,
@@ -219,8 +220,9 @@ def main(args: argparse.Namespace) -> None:
     print(f"Test_acc : {test_acc}")
     if metrics is not None:
         print(metrics.log())
-        for key, value in metrics.score().items():
-            wandb.run.summary[key] = value
+        if args.use_wandb:
+            for key, value in metrics.score().items():
+                wandb.run.summary[key] = value
 
 
 def parse_args() -> argparse.Namespace:
@@ -295,6 +297,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--attention_dir", type=str, help="path to attention npy file")
     parser.add_argument("--test_acc", type=float, help="test_acc when best val_loss")
     parser.add_argument("--mask_mode", type=str, choices=["black", "mean", "blur", "base"], default="black")
+    parser.add_argument("--use_wandb", action="store_true")
 
     return parse_with_config(parser)
 

@@ -16,8 +16,8 @@ MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
 # PATCH_CHOICE = [1, 4, 8, 16, 32]
 # WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
-PATCH_CHOICE = [1, 4, 8]
-WEIGHT_PATCH = [0.5, 0.45, 0.05]
+PATCH_CHOICE = [1, 4]
+WEIGHT_PATCH = [0.7, 0.3]
 
 class Mask_Generator():
     def __init__(
