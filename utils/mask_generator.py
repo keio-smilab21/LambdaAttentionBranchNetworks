@@ -15,8 +15,7 @@ from utils.utils import reverse_normalize
 
 MASK_RATIO_CHOICES = [0.1 ,0.2, 0.25, 0.3]
 WEIGHT = [0.2, 0.5, 0.2, 0.1]
-# PATCH_CHOICE = [1, 4, 8, 16, 32]
-# WEIGHT_PATCH = [0.7, 0.2, 0.05, 0.03, 0.02]
+
 PATCH_CHOICE = [1, 4]
 STEP = [500, 20]
 WEIGHT_PATCH = [0.7, 0.3]
@@ -67,35 +66,14 @@ class Mask_Generator():
 
             # attention -> patch_attention : 1, H', W' -> p_H, p_W
             patch_attention = self.divide_attention_map_into_patch(attention)
-            self.patch_attentions.append(patch_attention)  # p_H, p_W
+            self.patch_attentions.append(patch_attention)
 
             # patch_attentionの順位を計算
             self.orders.append(self.calculate_attention_order(idx=i))
 
             # make mask_image : 1, H, W
-            mask_input = self.create_one_mask_image(idx=i)
+            mask_input = self.create_one_mask_image(idx=i, save_mask=self.save_mask_input)
             mask_inputs[i] = mask_input
-        
-        # if self.save_mask_input:
-        #     # mask 画像の保存
-        #     # img = mask_inputs[-1].reshape(self.images.shape[2], self.images.shape[3]) # (512, 512)
-        #     print("aaa", mask_inputs[-1].shape)
-        #     # img = np.transpose(mask_inputs[-1], (1,2,0))
-        #     params = get_parameter_depend_in_data_set("IDRiD")
-        #     img = reverse_normalize(img, params["mean"], params["std"])
-        #     img = np.transpose(mask_inputs[-1], (1,2,0))
-        #     img = (img * 255).astype(np.uint8)
-        #     # fig, ax = plt.subplots()
-        #     # if img.shape[-1] == 1:
-        #     #     im = ax.imshow(img, cmap="gray")
-        #     # else:
-        #     #     im = ax.imshow(img, cmap="gray")
-        #     # fig.colorbar(im)
-        #     # plt.savefig(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
-        #     # plt.clf()
-        #     # plt.close()
-        #     Image.fromarray(img).save(f"mask_image/deletion/mask_ratio_{self.ratio}_{self.data_name}.png")
-
 
         return mask_inputs # B, C, H, W
 
@@ -114,7 +92,7 @@ class Mask_Generator():
         )
 
 
-    def create_one_mask_image(self, idx):
+    def create_one_mask_image(self, idx, save_mask=None):
         image = self.images[idx].cpu().numpy()              # C, H, W
         patch_attention = self.patch_attentions[idx]        # p_H, p_W
 
@@ -135,6 +113,8 @@ class Mask_Generator():
         threthold = patch_attention[w_indices, h_indices]
 
         mask_img = np.zeros(shape=image.shape)
+        if save_mask:
+            temp = np.zeros(shape=image.shape) # for save_mask_image
 
         if self.mask_mode in ["blur", "base"]:
             src_image = image
@@ -162,6 +142,7 @@ class Mask_Generator():
 
             for c in range(C):
                 mask_img[c] = src_image[c] * mask_src +  base_mask_image[c] * mask_base
+                if save_mask: temp[c] = mask_img[c]
                 mask_img[c] = (mask_img[c] - mean[c]) / std[c]
             
         else:
@@ -174,12 +155,10 @@ class Mask_Generator():
                 elif self.mask_mode == "mean":
                     mask_img[c] = mask * ((image[c] - mean[c]) / std[c])
         
-        # if self.patch_size == 1:
-        #     print("save patch image")
-        #     import matplotlib.pyplot as plt
-        #     temp = temp.transpose(1,2,0)
-        #     plt.imshow(temp)
-        #     plt.savefig("testtest1111.jpg")
+        if save_mask:
+            temp = temp.transpose(1,2,0)
+            plt.imshow(temp)
+            plt.savefig(f"./mask_image/ForKL/mask_patch{self.patch_size}_idx{idx}.jpg")
         return mask_img
 
     def divide_attention_map_into_patch(self, attention):
